@@ -1,0 +1,779 @@
+- name: Initialize a Git repository and make the first commit
+  preconditions:
+    - Starting a new project that needs version control
+    - A directory of existing code needs to be tracked
+  procedure:
+    - Run 'git init' in the project directory
+    - Create a '.gitignore' file for the language/tooling
+    - Run 'git add -A' to stage files
+    - Run 'git commit -m "Initial commit"'
+    - Optionally add a remote with 'git remote add origin <url>'
+  tags:
+    - tools
+    - git
+    - version-control
+  verified: true
+
+- name: Create a feature branch and open a pull request
+  preconditions:
+    - Working on a new feature or bug fix
+    - Using a feature-branch workflow
+  procedure:
+    - Switch to the default branch and pull latest changes
+    - Run 'git switch -c feature/<short-description>'
+    - Make focused commits with clear messages
+    - Push the branch with 'git push -u origin feature/<short-description>'
+    - Open a pull request and request review
+    - After approval, merge using the project's preferred method
+    - Delete the local and remote feature branch
+  tags:
+    - tools
+    - git
+    - collaboration
+  verified: true
+
+- name: Resolve a Git merge conflict
+  preconditions:
+    - A merge or rebase produced conflict markers
+    - Two branches changed the same part of a file
+  procedure:
+    - Run 'git status' to identify conflicted files
+    - Open each conflicted file and locate '<<<<<<<', '=======', '>>>>>>>' markers
+    - Choose or combine the correct changes
+    - Remove all conflict markers
+    - Run 'git add <file>' for each resolved file
+    - Run 'git commit' (for merge) or 'git rebase --continue' (for rebase)
+    - Run tests to verify the resolution
+  tags:
+    - tools
+    - git
+    - troubleshooting
+  verified: true
+
+- name: Undo the last commit while preserving changes
+  preconditions:
+    - The last commit is local and should be reworked
+    - Changes need to be split or recommitted
+  procedure:
+    - Run 'git reset --soft HEAD~1' to unstage but keep changes
+    - Optionally use 'git reset HEAD~1' to unstage and keep changes unstaged
+    - Re-stage and commit the changes as desired
+    - Avoid this on already-pushed commits
+  tags:
+    - tools
+    - git
+    - undo
+  verified: true
+
+- name: Stash unfinished changes and restore them later
+  preconditions:
+    - Need to switch branches without committing current changes
+    - Want to temporarily save work in progress
+  procedure:
+    - Run 'git stash push -m "descriptive message"'
+    - Switch branches and do other work
+    - Run 'git stash list' to see saved stashes
+    - Run 'git stash pop' to apply and remove the latest stash
+    - Or run 'git stash apply stash@{n}' to apply a specific stash without removing it
+  tags:
+    - tools
+    - git
+    - context-switching
+  verified: true
+
+- name: Write a defensive Bash script
+  preconditions:
+    - Automating a task with shell scripting
+    - Need reliability and clear failure behavior
+  procedure:
+    - Start with '#!/usr/bin/env bash'
+    - Enable strict mode 'set -euo pipefail' and 'IFS=$'\n\t''
+    - Quote all variable expansions
+    - Use 'local' in functions
+    - Clean up with 'trap cleanup EXIT'
+    - Validate required environment variables with '${VAR:?message}'
+    - Run 'shellcheck' and fix warnings
+  tags:
+    - tools
+    - shell
+    - bash
+    - scripting
+  verified: true
+
+- name: Parse command-line arguments in a Bash script
+  preconditions:
+    - Script needs flags and positional arguments
+    - Avoiding external dependencies
+  procedure:
+    - Define a 'usage' function
+    - Use 'getopts' for option parsing
+    - Handle 'OPTARG' and unknown options
+    - Shift away parsed options with 'shift $((OPTIND - 1))'
+    - Validate required positional arguments
+    - Print help when '-h' or '--help' is requested
+  tags:
+    - tools
+    - shell
+    - scripting
+  verified: true
+
+- name: Build a small Docker image for a Node.js application
+  preconditions:
+    - Application has a package.json and a start command
+    - Image should run in production
+  procedure:
+    - Choose a minimal base image like 'node:20-alpine'
+    - Set 'WORKDIR /app'
+    - Copy 'package.json' and lockfile first
+    - Run 'npm ci --omit=dev'
+    - Copy remaining source files
+    - Create and switch to a non-root user
+    - Set 'CMD' with exec form
+    - Build with 'docker build -t myapp:tag .'
+    - Test the container locally
+  tags:
+    - tools
+    - docker
+    - containers
+    - nodejs
+  verified: true
+
+- name: Use a multi-stage Docker build
+  preconditions:
+    - Build process requires compilers or dev dependencies
+    - Final image should be small and secure
+  procedure:
+    - Define a builder stage with build dependencies
+    - Compile or install production artifacts in the builder stage
+    - Define a final stage from a minimal runtime image
+    - Copy only needed artifacts with 'COPY --from=builder'
+    - Run as non-root in the final stage
+    - Build and verify image size with 'docker images'
+  tags:
+    - tools
+    - docker
+    - optimization
+  verified: true
+
+- name: Define a multi-service development environment with Docker Compose
+  preconditions:
+    - Application has multiple services or dependencies
+    - Need reproducible local development environment
+  procedure:
+    - Create a 'compose.yaml' file
+    - Define each service with image or build context
+    - Map needed ports
+    - Use environment variables or '.env' files
+    - Mount volumes for code reload in development
+    - Run 'docker compose up -d'
+    - Verify with 'docker compose ps' and 'docker compose logs'
+  tags:
+    - tools
+    - docker
+    - docker-compose
+    - development
+  verified: true
+
+- name: Manage Python dependencies with uv
+  preconditions:
+    - Working on a Python project
+    - Want fast installs and a lockfile
+  procedure:
+    - Ensure 'uv' is installed
+    - Run 'uv init' or 'uv add <package>' in the project
+    - Add dev dependencies with 'uv add --dev <package>'
+    - Run 'uv sync --locked' to install from lockfile
+    - Run commands in the environment with 'uv run <command>'
+    - Commit 'pyproject.toml' and 'uv.lock'
+  tags:
+    - tools
+    - python
+    - package-manager
+    - uv
+  verified: true
+
+- name: Manage Node.js dependencies safely
+  preconditions:
+    - Working on a Node.js project
+    - Need reproducible installs
+  procedure:
+    - Use 'npm install' or 'pnpm add' locally during development
+    - Commit the lockfile ('package-lock.json', 'pnpm-lock.yaml', etc.)
+    - In CI and production use 'npm ci' or 'pnpm install --frozen-lockfile'
+    - Run 'npm audit' or 'pnpm audit' regularly
+    - Separate runtime and dev dependencies
+  tags:
+    - tools
+    - nodejs
+    - package-manager
+    - npm
+  verified: true
+
+- name: Create and use a Python virtual environment
+  preconditions:
+    - Installing Python packages for a project
+    - Avoiding conflicts with system packages
+  procedure:
+    - Run 'python -m venv .venv' in the project root
+    - Activate with 'source .venv/bin/activate' (Linux/macOS) or '.venv\Scripts\activate' (Windows)
+    - Install dependencies with 'pip install -r requirements.txt'
+    - Pin dependencies in 'requirements.txt' or use a lockfile
+    - Add '.venv/' to '.gitignore'
+  tags:
+    - tools
+    - python
+    - virtualenv
+  verified: true
+
+- name: Set up a CMake project with out-of-source builds
+  preconditions:
+    - C or C++ project
+    - Need portable build configuration
+  procedure:
+    - Write a 'CMakeLists.txt' with 'cmake_minimum_required' and 'project'
+    - Use 'add_executable' or 'add_library'
+    - Attach include dirs and compile options to targets
+    - Configure with 'cmake -S . -B build'
+    - Build with 'cmake --build build --parallel'
+    - Run tests with 'ctest --test-dir build'
+  tags:
+    - tools
+    - c
+    - cpp
+    - cmake
+    - build-system
+  verified: true
+
+- name: Write a maintainable Makefile
+  preconditions:
+    - Project has common tasks like build, test, lint
+    - Want self-documenting command runner
+  procedure:
+    - Declare '.PHONY' for all non-file targets
+    - Use variables for tools and flags
+    - Add a 'help' target using awk or grep
+    - Keep recipes tab-indented
+    - Document targets with '##' comments
+    - Run 'make help' to verify
+  tags:
+    - tools
+    - make
+    - build-system
+  verified: true
+
+- name: Set up a GitHub Actions CI pipeline
+  preconditions:
+    - Code is hosted on GitHub
+    - Want automated tests and checks
+  procedure:
+    - Create '.github/workflows/ci.yml'
+    - Define 'on' triggers (push, pull_request)
+    - Define jobs with 'runs-on'
+    - Check out code with 'actions/checkout@v4'
+    - Set up language runtime
+    - Install dependencies
+    - Run lint, format check, and tests
+    - Save lockfiles and cache dependency directories
+  tags:
+    - tools
+    - ci-cd
+    - github-actions
+  verified: true
+
+- name: Authenticate and push to a GitHub repository with the gh CLI
+  preconditions:
+    - Need to create repos, PRs, or releases from the terminal
+    - Have a GitHub account
+  procedure:
+    - Run 'gh auth login' and follow prompts
+    - Run 'gh repo create my-project --public --source=. --push'
+    - Use 'gh pr create' to open pull requests
+    - Use 'gh pr checkout <number>' to review PRs locally
+    - Use 'gh release create v1.0.0 --generate-notes' for releases
+  tags:
+    - tools
+    - github
+    - cli
+    - collaboration
+  verified: true
+
+- name: Search and replace text across a repository safely
+  preconditions:
+    - Renaming a symbol, URL, or term across many files
+    - Want to avoid accidental replacements
+  procedure:
+    - Preview matches with 'rg' or 'grep -R'
+    - Check for re-exports, string references, and config files
+    - Use 'sed' or IDE refactoring with care
+    - Limit to relevant file extensions
+    - Run the test suite after replacement
+    - Review the diff before committing
+  tags:
+    - tools
+    - refactoring
+    - search
+    - sed
+  verified: true
+
+- name: Inspect and debug a running Docker container
+  preconditions:
+    - Container is misbehaving
+    - Need to see logs, files, or processes
+  procedure:
+    - Run 'docker ps' to find the container name or ID
+    - View logs with 'docker logs --tail 100 -f <container>'
+    - Execute a shell with 'docker exec -it <container> bash' or 'sh'
+    - Inspect config with 'docker inspect <container>'
+    - Check resource usage with 'docker stats'
+    - Reproduce locally with the same environment variables
+  tags:
+    - tools
+    - docker
+    - debugging
+    - troubleshooting
+  verified: true
+
+- name: Clean up Docker resources to free disk space
+  preconditions:
+    - Docker disk usage is high
+    - Old images, containers, or volumes are no longer needed
+  procedure:
+    - Review usage with 'docker system df'
+    - Remove unused containers with 'docker container prune -f'
+    - Remove unused images with 'docker image prune -a -f'
+    - Remove unused volumes with 'docker volume prune -f'
+    - Run 'docker system prune -a --volumes -f' for a full cleanup
+    - Confirm important images are rebuilt or still available
+  tags:
+    - tools
+    - docker
+    - maintenance
+  verified: true
+
+- name: Rotate leaked credentials in a Git repository
+  preconditions:
+    - A secret was accidentally committed
+    - The secret is active and must be invalidated
+  procedure:
+    - Immediately revoke or rotate the credential in the provider console
+    - Remove the secret from current files
+    - Run 'git filter-repo' or BFG Repo-Cleaner to remove from history
+    - Update '.gitignore' and add pre-commit hooks like 'git-secrets'
+    - Force-push to remote with coordination with team
+    - Notify team members to re-clone if necessary
+  tags:
+    - tools
+    - git
+    - security
+    - secrets
+  verified: true
+
+- name: Configure SSH keys for Git and remote servers
+  preconditions:
+    - Need passwordless authentication
+    - Setting up a new development machine
+  procedure:
+    - Generate a key with 'ssh-keygen -t ed25519 -C "comment"'
+    - Add the public key to the remote service or '~/.ssh/authorized_keys'
+    - Start the agent with 'eval "$(ssh-agent -s)"'
+    - Add the key with 'ssh-add ~/.ssh/id_ed25519'
+    - Configure '~/.ssh/config' for aliases and keys
+    - Test with 'ssh -T git@github.com' or 'ssh <host>'
+  tags:
+    - tools
+    - ssh
+    - security
+    - authentication
+  verified: true
+
+- name: Make an HTTP request and parse JSON with curl and jq
+  preconditions:
+    - Need to interact with a REST API
+    - Want to extract specific fields from JSON
+  procedure:
+    - "Use 'curl -fsSL -H \"Accept: application/json\" <url>'"
+    - "For POST, add '-X POST -H \"Content-Type: application/json\" -d '{...}''"
+    - Pipe to 'jq' for filtering
+    - Example 'curl -s <url> | jq '.items[0].name''
+    - Handle pagination if needed
+  tags:
+    - tools
+    - curl
+    - jq
+    - http
+    - api
+  verified: true
+
+- name: Monitor logs for errors
+  preconditions:
+    - Debugging a running service
+    - Investigating failures
+  procedure:
+    - Identify log location or use 'journalctl -u <service>'
+    - Tail logs with 'tail -f' or 'journalctl -f'
+    - Filter errors with 'grep -i error'
+    - Look for stack traces, timestamps, and request IDs
+    - Correlate errors with recent deployments or changes
+  tags:
+    - tools
+    - logging
+    - debugging
+    - troubleshooting
+  verified: true
+
+- name: Format and lint a Python codebase
+  preconditions:
+    - Python project needs consistent style
+    - Want to catch issues before CI
+  procedure:
+    - Install ruff, mypy, and optionally bandit
+    - Run 'ruff check .' and 'ruff format .'
+    - Run 'mypy src/'
+    - Run 'bandit -r src/' for security issues
+    - Fix findings and add the commands to CI
+  tags:
+    - tools
+    - python
+    - linting
+    - formatting
+  verified: true
+
+- name: Format and lint a JavaScript or TypeScript codebase
+  preconditions:
+    - Node.js project needs consistent style
+    - Want to catch issues before CI
+  procedure:
+    - Install eslint and prettier
+    - Run 'eslint src/'
+    - Run 'prettier --check src/' or 'prettier --write src/'
+    - Run 'tsc --noEmit' for type checking
+    - Add the commands to 'package.json' scripts and CI
+  tags:
+    - tools
+    - javascript
+    - typescript
+    - linting
+    - formatting
+  verified: true
+
+- name: Run a local static file server
+  preconditions:
+    - Need to quickly serve files over HTTP
+    - Testing a static site or sharing files locally
+  procedure:
+    - Python 'python -m http.server 8000'
+    - Node 'npx serve .'
+    - Or use 'python -m http.server --directory dist'
+    - Open browser to 'http://localhost:8000'
+  tags:
+    - tools
+    - http
+    - development
+    - quick-tips
+  verified: true
+
+- name: Transfer files to or from a remote server
+  preconditions:
+    - Need to copy files securely
+    - Have SSH access to the remote host
+  procedure:
+    - Use 'scp -r ./local deploy@host:/remote/path' for simple copies
+    - Prefer 'rsync -avz --exclude='.git' ./ deploy@host:/remote/path' for efficiency
+    - Verify files arrived with 'ssh deploy@host ls /remote/path'
+    - For large transfers, consider 'rsync --progress'
+  tags:
+    - tools
+    - ssh
+    - rsync
+    - scp
+    - deployment
+  verified: true
+
+- name: Create a self-documenting task runner with just
+  preconditions:
+    - Project has recurring commands
+    - Want a lightweight alternative to Make
+  procedure:
+    - Install 'just'
+    - Create a 'Justfile' in the project root
+    - Define recipes for build, test, lint, run
+    - Use variables and dependencies between recipes
+    - Run 'just --list' to see available recipes
+  tags:
+    - tools
+    - task-runner
+    - just
+    - automation
+  verified: true
+
+- name: Troubleshoot a failed CI job
+  preconditions:
+    - A CI pipeline failed
+    - Need to identify the cause
+  procedure:
+    - Read the failed job logs from the top
+    - Identify the exact command and error message
+    - Reproduce the failure locally if possible
+    - Check for environment differences (OS, tool versions)
+    - Verify dependency lockfiles are committed
+    - Fix the issue, push, and re-run CI
+  tags:
+    - tools
+    - ci-cd
+    - troubleshooting
+    - debugging
+  verified: true
+
+- name: Set up pre-commit hooks for a repository
+  preconditions:
+    - Want to catch issues before commits are made
+    - Team agrees on linting and formatting tools
+  procedure:
+    - Install 'pre-commit' with pip or a package manager
+    - Create '.pre-commit-config.yaml'
+    - Add hooks for trailing whitespace, end-of-file fixer, black, ruff, eslint, shellcheck
+    - Run 'pre-commit install' to install the git hook
+    - Run 'pre-commit run --all-files' to test the configuration
+  tags:
+    - tools
+    - git
+    - quality
+    - automation
+  verified: true
+
+- name: Back up a PostgreSQL database
+  preconditions:
+    - Need to export a PostgreSQL database
+    - Have credentials and network access
+  procedure:
+    - Run 'pg_dump -h host -U user -d dbname > backup.sql'
+    - Use '--no-owner' and '--no-privileges' if restoring to a different user
+    - Compress with 'pg_dump ... | gzip > backup.sql.gz'
+    - Verify with 'pg_restore --list' or a test restore
+  tags:
+    - tools
+    - database
+    - postgresql
+    - backup
+  verified: true
+
+- name: Restore a PostgreSQL database from a dump
+  preconditions:
+    - Have a valid PostgreSQL dump file
+    - Target database exists and is accessible
+  procedure:
+    - Create the target database if needed with 'createdb -h host -U user dbname'
+    - For plain SQL dumps run 'psql -h host -U user -d dbname < backup.sql'
+    - For custom-format dumps run 'pg_restore -h host -U user -d dbname backup.dump'
+    - Verify schemas and data
+  tags:
+    - tools
+    - database
+    - postgresql
+    - restore
+  verified: true
+
+- name: Generate a project changelog from Git history
+  preconditions:
+    - Project follows conventional commits
+    - Need a human-readable changelog
+  procedure:
+    - Ensure commits use types like 'feat', 'fix', 'chore'
+    - Install a changelog generator such as 'git-cliff' or 'conventional-changelog'
+    - Run 'git-cliff --output CHANGELOG.md'
+    - Review and edit the generated changelog
+    - Commit the updated changelog with a release
+  tags:
+    - tools
+    - git
+    - documentation
+    - release
+  verified: true
+
+- name: Audit dependencies for known vulnerabilities
+  preconditions:
+    - Want to check for security issues in dependencies
+    - Lockfile or manifest is available
+  procedure:
+    - For Node.js run 'npm audit' or 'pnpm audit'
+    - For Python run 'pip-audit' or 'uv pip audit'
+    - For Rust run 'cargo audit'
+    - Review findings and severity
+    - Update vulnerable packages and run tests
+    - Add audit commands to CI
+  tags:
+    - tools
+    - security
+    - dependencies
+    - audit
+  verified: true
+
+- name: Configure a project to ignore unwanted files
+  preconditions:
+    - Build artifacts, secrets, or dependencies should not be committed
+  procedure:
+    - Create or update '.gitignore'
+    - Add patterns for OS files, IDE dirs, build output, dependencies, secrets
+    - Add language-specific entries
+    - Test with 'git status' to ensure files are ignored
+    - If a tracked file should be ignored, run 'git rm --cached <file>' and commit
+  tags:
+    - tools
+    - git
+    - configuration
+  verified: true
+
+- name: Use tmux for persistent terminal sessions
+  preconditions:
+    - Long-running process in a remote shell
+    - Need to detach and reattach later
+  procedure:
+    - Start a session with 'tmux new -s work'
+    - Detach with 'Ctrl-b d'
+    - List sessions with 'tmux ls'
+    - Reattach with 'tmux attach -t work'
+    - Kill a session with 'tmux kill-session -t work'
+  tags:
+    - tools
+    - tmux
+    - terminal
+    - productivity
+  verified: true
+
+- name: Use SSH port forwarding to access a remote service locally
+  preconditions:
+    - Need to reach a service only available on a remote host or inside a private network
+    - Have SSH access to a gateway host
+  procedure:
+    - For local forward run 'ssh -L local_port:target_host:target_port user@gateway'
+    - For remote forward run 'ssh -R remote_port:localhost:local_port user@gateway'
+    - Access the service through 'localhost:local_port'
+    - Keep the SSH session open while using the tunnel
+  tags:
+    - tools
+    - ssh
+    - networking
+  verified: true
+
+- name: Convert a CSV file to JSON
+  preconditions:
+    - Need to process CSV data in a JSON pipeline
+    - Have 'mlr' or Python available
+  procedure:
+    - With Miller run 'mlr --csv cat input.csv | mlr --json cat > output.json'
+    - With Python run 'python -c "import csv,json,sys; print(json.dumps(list(csv.DictReader(sys.stdin))))" < input.csv'
+    - Verify output structure
+  tags:
+    - tools
+    - csv
+    - json
+    - data-processing
+  verified: true
+
+- name: Create a simple web hook receiver for testing
+  preconditions:
+    - Need to inspect HTTP payloads from a webhook
+    - Quick local debugging
+  procedure:
+    - Use 'npx webhook.site' or 'ngrok http 8000' for public URLs
+    - Or run a small Python server with Flask/FastAPI to print headers and body
+    - Point the external service at the public URL
+    - Inspect received payloads
+  tags:
+    - tools
+    - http
+    - debugging
+    - webhooks
+  verified: true
+
+- name: Update all Git submodules after cloning or pulling
+  preconditions:
+    - Repository contains submodules
+    - Submodules appear empty or at wrong commits
+  procedure:
+    - Run 'git submodule update --init --recursive'
+    - For latest remote commits run 'git submodule update --remote'
+    - Commit submodule pointer changes if needed
+  tags:
+    - tools
+    - git
+    - submodules
+  verified: true
+
+- name: Rebase a local feature branch onto the default branch
+  preconditions:
+    - Feature branch is local or only you are working on it
+    - Want linear history before merging
+  procedure:
+    - Switch to the default branch and pull latest
+    - Switch to feature branch
+    - Run 'git rebase main' (or 'origin/main')
+    - Resolve conflicts if prompted
+    - Run tests
+    - Force-push with lease if the branch was already pushed 'git push --force-with-lease'
+  tags:
+    - tools
+    - git
+    - rebase
+  verified: true
+
+- name: Cherry-pick a commit to another branch
+  preconditions:
+    - A single commit needs to be applied elsewhere
+    - Not merging an entire branch
+  procedure:
+    - Switch to the target branch
+    - Run 'git cherry-pick <commit-hash>'
+    - Resolve conflicts if necessary
+    - Run 'git cherry-pick --continue' or '--abort'
+    - Run tests and push
+  tags:
+    - tools
+    - git
+    - cherry-pick
+  verified: true
+
+- name: Tag a release and push it
+  preconditions:
+    - Code on the default branch is ready for release
+  procedure:
+    - Decide on a version following semver
+    - Run 'git tag -a v1.2.3 -m "Release 1.2.3"'
+    - Run 'git push origin v1.2.3'
+    - Optionally push all tags with 'git push origin --tags'
+    - Create a release note on the hosting platform
+  tags:
+    - tools
+    - git
+    - release
+  verified: true
+
+- name: Set up a project-specific Python version
+  preconditions:
+    - Project requires a specific Python version
+    - Want reproducible local and CI environments
+  procedure:
+    - Use 'pyenv install 3.12.4'
+    - Create a '.python-version' file with 'pyenv local 3.12.4'
+    - Or use 'uv' and specify 'requires-python' in 'pyproject.toml'
+    - Pin the Python version in CI setup actions
+  tags:
+    - tools
+    - python
+    - version-management
+  verified: true
+
+- name: Set up a project-specific Node.js version
+  preconditions:
+    - Project requires a specific Node.js version
+    - Want reproducible local and CI environments
+  procedure:
+    - Create '.nvmrc' with the version number
+    - Use 'nvm install' and 'nvm use'
+    - Pin the Node version in CI with 'actions/setup-node' reading '.nvmrc'
+    - Document the required version in README
+  tags:
+    - tools
+    - nodejs
+    - version-management
+  verified: true

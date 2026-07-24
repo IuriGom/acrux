@@ -1,0 +1,2949 @@
+- name: Load an image with OpenCV
+  preconditions:
+    - The image file exists and is in a format OpenCV can decode.
+    - You need a NumPy array representation of the image.
+  procedure:
+    - Import cv2.
+    - Call cv2.imread(path, flags) with the desired flag.
+    - Check that the result is not None.
+    - Convert color space if needed (BGR to RGB).
+  tags:
+    - vision
+    - opencv
+    - image-loading
+  verified: true
+
+- name: Load an image with Pillow
+  preconditions:
+    - The image file exists.
+    - You need a Pillow Image object for high-level manipulation.
+  procedure:
+    - Import Image from PIL.
+    - Open the image with Image.open(path) inside a context manager.
+    - Apply ImageOps.exif_transpose to handle orientation.
+    - Convert to the desired mode (RGB, L, RGBA).
+    - Return a copy to close the file handle.
+  tags:
+    - vision
+    - pillow
+    - image-loading
+  verified: true
+
+- name: Convert BGR to RGB
+  preconditions:
+    - You have a color image loaded with OpenCV or another BGR source.
+  procedure:
+    - Use cv2.cvtColor(img, cv2.COLOR_BGR2RGB).
+    - Alternatively swap channels with img[..., ::-1].
+    - Verify colors look correct in matplotlib or Pillow.
+  tags:
+    - vision
+    - opencv
+    - color-space
+  verified: true
+
+- name: Resize an image while preserving aspect ratio
+  preconditions:
+    - You want to fit the image within a maximum dimension without distortion.
+  procedure:
+    - Compute scale = min(max_size / height, max_size / width).
+    - Compute new dimensions.
+    - Call cv2.resize or PIL Image.resize with the computed size.
+    - Choose interpolation appropriate for upscaling or downscaling.
+  tags:
+    - vision
+    - preprocessing
+    - resize
+  verified: true
+
+- name: Crop a region of interest
+  preconditions:
+    - You know the pixel coordinates of the region.
+  procedure:
+    - Define box as (left, upper, right, lower) or (x1, y1, x2, y2).
+    - Use NumPy slicing or PIL Image.crop.
+    - Copy the crop if you will modify it.
+  tags:
+    - vision
+    - preprocessing
+    - crop
+  verified: true
+
+- name: Apply Gaussian blur
+  preconditions:
+    - You need to reduce high-frequency noise.
+  procedure:
+    - Convert to grayscale if only luminance noise matters.
+    - Choose an odd kernel size.
+    - Call cv2.GaussianBlur(img, (k, k), sigmaX).
+  tags:
+    - vision
+    - filtering
+    - blur
+  verified: true
+
+- name: Detect edges with Canny
+  preconditions:
+    - You have a grayscale image.
+    - You want to find object boundaries.
+  procedure:
+    - Optionally blur the image first to reduce noise.
+    - Choose lower and upper thresholds.
+    - Call cv2.Canny(gray, lower, upper).
+    - Visualize the result.
+  tags:
+    - vision
+    - edge-detection
+    - opencv
+  verified: true
+
+- name: Find and analyze contours
+  preconditions:
+    - You have a binary mask or edge image.
+  procedure:
+    - Call cv2.findContours with an appropriate retrieval mode.
+    - Iterate over contours and compute area, perimeter, bounding box.
+    - Filter small or invalid contours.
+    - Draw or use contours for further analysis.
+  tags:
+    - vision
+    - contours
+    - shape-analysis
+  verified: true
+
+- name: Apply morphological operations
+  preconditions:
+    - You have a binary mask with noise or holes.
+  procedure:
+    - Create a structuring element with cv2.getStructuringElement or np.ones.
+    - Apply opening to remove small noise.
+    - Apply closing to fill small holes.
+    - Visualize before and after.
+  tags:
+    - vision
+    - morphology
+    - preprocessing
+  verified: true
+
+- name: Convert an image to grayscale
+  preconditions:
+    - You need a single-channel intensity image.
+  procedure:
+    - "With OpenCV: cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)."
+    - "With Pillow: im.convert(\"L\")."
+    - "With scikit-image: color.rgb2gray (returns float64)."
+  tags:
+    - vision
+    - color-space
+    - grayscale
+  verified: true
+
+- name: Perform histogram equalization
+  preconditions:
+    - You have a grayscale image with poor contrast.
+  procedure:
+    - "For global equalization: cv2.equalizeHist."
+    - "For adaptive: create CLAHE and apply."
+    - Compare original and result.
+  tags:
+    - vision
+    - contrast
+    - enhancement
+  verified: true
+
+- name: Threshold an image
+  preconditions:
+    - You want to create a binary mask.
+  procedure:
+    - Convert to grayscale if needed.
+    - Choose global threshold or Otsu's method.
+    - For uneven lighting, use adaptiveThreshold.
+    - Verify mask values are 0 and 255.
+  tags:
+    - vision
+    - thresholding
+    - segmentation
+  verified: true
+
+- name: Apply affine and perspective transforms
+  preconditions:
+    - You know source and destination point correspondences.
+  procedure:
+    - Select 3 point pairs for affine or 4 for perspective.
+    - Compute matrix with cv2.getAffineTransform or cv2.getPerspectiveTransform.
+    - Apply with cv2.warpAffine or cv2.warpPerspective.
+  tags:
+    - vision
+    - geometric-transforms
+    - alignment
+  verified: true
+
+- name: Detect and match features
+  preconditions:
+    - You need to align, stitch, or compare two images.
+  procedure:
+    - Detect keypoints and descriptors with ORB or SIFT.
+    - Match descriptors with BFMatcher or FlannBasedMatcher.
+    - Apply Lowe's ratio test.
+    - Estimate homography if needed.
+  tags:
+    - vision
+    - features
+    - matching
+  verified: true
+
+- name: Read and write video
+  preconditions:
+    - You have a video file or camera device.
+  procedure:
+    - Open with cv2.VideoCapture.
+    - Check isOpened and read frames in a loop.
+    - Use cv2.VideoWriter to save output.
+    - Release resources when done.
+  tags:
+    - vision
+    - video
+    - opencv
+  verified: true
+
+- name: Extract frames from a video
+  preconditions:
+    - You need still images from a video for a dataset.
+  procedure:
+    - Open the video with cv2.VideoCapture.
+    - Compute frame interval from FPS and desired seconds.
+    - Read frames in a loop and save at intervals.
+    - Release the capture.
+  tags:
+    - vision
+    - video
+    - dataset
+  verified: true
+
+- name: Apply data augmentation for classification
+  preconditions:
+    - You are training an image classifier.
+  procedure:
+    - Use random resized crop, horizontal flip, and color jitter for training.
+    - Use deterministic resize and center crop for validation.
+    - Normalize with the pretrained model's statistics.
+  tags:
+    - vision
+    - augmentation
+    - classification
+  verified: true
+
+- name: Apply data augmentation for object detection
+  preconditions:
+    - You are training an object detector.
+    - You have bounding box annotations.
+  procedure:
+    - Use Albumentations with bbox_params.
+    - Apply spatial transforms to image and boxes together.
+    - Filter invalid boxes after transformation.
+    - Keep photometric augmentations moderate.
+  tags:
+    - vision
+    - augmentation
+    - object-detection
+  verified: true
+
+- name: Normalize images for ImageNet pretrained models
+  preconditions:
+    - You are using a model pretrained on ImageNet.
+  procedure:
+    - Resize and crop to the model input size.
+    - Convert to tensor and scale to [0, 1].
+    - Normalize with mean [0.485, 0.456, 0.406] and std [0.229, 0.224, 0.225].
+  tags:
+    - vision
+    - normalization
+    - deep-learning
+  verified: true
+
+- name: Convert between OpenCV and PyTorch tensors
+  preconditions:
+    - You need to feed an OpenCV image to a PyTorch model or visualize a tensor.
+  procedure:
+    - "OpenCV image: BGR HWC uint8."
+    - Convert to RGB, permute to CHW, scale to [0, 1].
+    - "Reverse: permute, scale to [0, 255], convert to BGR for OpenCV display."
+  tags:
+    - vision
+    - opencv
+    - pytorch
+    - conversion
+  verified: true
+
+- name: Convert between OpenCV and Pillow
+  preconditions:
+    - You need to use both libraries in the same pipeline.
+  procedure:
+    - "OpenCV to Pillow: COLOR_BGR2RGB then Image.fromarray."
+    - "Pillow to OpenCV: np.array then COLOR_RGB2BGR."
+  tags:
+    - vision
+    - opencv
+    - pillow
+    - conversion
+  verified: true
+
+- name: Handle EXIF orientation
+  preconditions:
+    - Loading photos from cameras or phones.
+  procedure:
+    - Use Pillow ImageOps.exif_transpose after opening.
+    - Or read EXIF Orientation and rotate manually.
+    - Do this before any cropping or resizing.
+  tags:
+    - vision
+    - metadata
+    - orientation
+  verified: true
+
+- name: Add text annotations to an image
+  preconditions:
+    - You want to label detected objects or display metrics.
+  procedure:
+    - "With OpenCV: cv2.putText with appropriate font and color."
+    - "With Pillow: ImageDraw.text with a loaded font."
+    - Ensure text fits within the image bounds.
+  tags:
+    - vision
+    - annotation
+    - visualization
+  verified: true
+
+- name: Draw bounding boxes
+  preconditions:
+    - You have bounding box predictions or annotations.
+  procedure:
+    - Iterate over boxes.
+    - Draw rectangles with cv2.rectangle or PIL ImageDraw.rectangle.
+    - Add labels and confidence scores.
+    - Use distinct colors per class.
+  tags:
+    - vision
+    - object-detection
+    - visualization
+  verified: true
+
+- name: Overlay a segmentation mask
+  preconditions:
+    - You have a predicted or ground-truth mask.
+  procedure:
+    - Convert mask to a colored overlay.
+    - Blend with the original image using addWeighted or alpha_composite.
+    - Optionally show class legend.
+  tags:
+    - vision
+    - segmentation
+    - visualization
+  verified: true
+
+- name: Save an image correctly
+  preconditions:
+    - You want to persist a processed image.
+  procedure:
+    - Ensure color space matches the saver (BGR for cv2.imwrite, RGB for PIL).
+    - Clip values to the valid range before casting.
+    - Use the right format for the content (JPEG for photos, PNG for masks).
+  tags:
+    - vision
+    - io
+    - saving
+  verified: true
+
+- name: Validate image integrity
+  preconditions:
+    - You need to filter corrupt or unsupported files.
+  procedure:
+    - Try to open with Pillow and call verify.
+    - Or load with cv2.imread and check for None.
+    - Optionally check dimensions and channel count.
+  tags:
+    - vision
+    - validation
+    - quality
+  verified: true
+
+- name: Batch process images in parallel
+  preconditions:
+    - You have many images to process.
+  procedure:
+    - Define a pure function that processes one image.
+    - Use joblib Parallel or multiprocessing Pool.
+    - Handle errors gracefully per image.
+    - Track results and failures.
+  tags:
+    - vision
+    - batch-processing
+    - performance
+  verified: true
+
+- name: Resize segmentation masks correctly
+  preconditions:
+    - You need to resize a label mask to match an image size.
+  procedure:
+    - Always use nearest-neighbor interpolation.
+    - Cast to integer type if needed.
+    - Verify unique class IDs are preserved.
+  tags:
+    - vision
+    - segmentation
+    - resize
+  verified: true
+
+- name: Compute Intersection over Union (IoU)
+  preconditions:
+    - You are evaluating object detection or segmentation.
+  procedure:
+    - Compute intersection area of two boxes or masks.
+    - Compute union area.
+    - Return intersection divided by union.
+    - Handle zero union case.
+  tags:
+    - vision
+    - metrics
+    - evaluation
+  verified: true
+
+- name: Non-maximum suppression for detections
+  preconditions:
+    - You have overlapping bounding boxes with confidence scores.
+  procedure:
+    - Sort boxes by score descending.
+    - Iteratively keep the highest-scoring box and remove boxes with IoU above threshold.
+    - Return indices of kept boxes.
+  tags:
+    - vision
+    - object-detection
+    - post-processing
+  verified: true
+
+- name: Perform OCR preprocessing
+  preconditions:
+    - You want to improve text recognition accuracy.
+  procedure:
+    - Convert to grayscale.
+    - Denoise.
+    - Resize to target DPI.
+    - Apply thresholding or binarization.
+    - Deskew if needed.
+  tags:
+    - vision
+    - ocr
+    - preprocessing
+  verified: true
+
+- name: Run inference with a pretrained PyTorch vision model
+  preconditions:
+    - You have a trained model and input images.
+  procedure:
+    - Set model to eval mode.
+    - Apply the correct preprocessing.
+    - Move input and model to the same device.
+    - Wrap forward pass in torch.no_grad.
+    - Post-process outputs as needed.
+  tags:
+    - vision
+    - deep-learning
+    - inference
+    - pytorch
+  verified: true
+
+- name: Export a PyTorch model to ONNX
+  preconditions:
+    - You want to deploy the model with ONNX Runtime or similar.
+  procedure:
+    - Create a dummy input matching the model input shape.
+    - Call torch.onnx.export with input names, output names, and opset version.
+    - Include dynamic axes for batch size if needed.
+    - Verify the ONNX model with onnxruntime.
+  tags:
+    - vision
+    - deep-learning
+    - deployment
+    - onnx
+  verified: true
+
+- name: Profile image preprocessing latency
+  preconditions:
+    - You need to identify slow steps in a pipeline.
+  procedure:
+    - Time each stage separately using time.perf_counter.
+    - Run multiple iterations and average.
+    - Identify the bottleneck and optimize or parallelize it.
+  tags:
+    - vision
+    - performance
+    - profiling
+  verified: true
+
+- name: Handle missing or corrupt images gracefully
+  preconditions:
+    - You are processing a large dataset where some files may be bad.
+  procedure:
+    - Wrap loading in try/except.
+    - Return a default image or None.
+    - Log the failure.
+    - Continue processing the rest of the dataset.
+  tags:
+    - vision
+    - robustness
+    - error-handling
+  verified: true
+
+- name: Set random seeds for reproducibility
+  preconditions:
+    - You need deterministic results across runs.
+  procedure:
+    - Set random.seed.
+    - Set numpy.random.seed.
+    - Set torch.manual_seed and torch.cuda.manual_seed_all.
+    - Set deterministic flags in PyTorch.
+  tags:
+    - vision
+    - reproducibility
+    - training
+  verified: true
+
+- name: Visualize image histograms
+  preconditions:
+    - You want to inspect exposure or color distribution.
+  procedure:
+    - Compute histogram with cv2.calcHist or np.histogram.
+    - Plot each channel separately for color images.
+    - Use the histogram to guide contrast adjustments.
+  tags:
+    - vision
+    - histogram
+    - visualization
+  verified: true
+
+- name: Apply color space segmentation
+  preconditions:
+    - You want to isolate objects of a specific color.
+  procedure:
+    - Convert image to HSV.
+    - Define lower and upper bounds for the target color.
+    - Use cv2.inRange to create a mask.
+    - Clean the mask with morphology.
+  tags:
+    - vision
+    - color-segmentation
+    - hsv
+  verified: true
+
+- name: Detect faces with Haar cascades
+  preconditions:
+    - You need a quick, lightweight face detector.
+  procedure:
+    - Load the Haar cascade XML.
+    - Convert image to grayscale.
+    - Call detectMultiScale with appropriate scale and minNeighbors.
+    - Filter or refine detections if needed.
+  tags:
+    - vision
+    - face-detection
+    - opencv
+  verified: true
+
+- name: Calibrate a camera with a checkerboard
+  preconditions:
+    - You have multiple images of a checkerboard pattern.
+  procedure:
+    - Define object points for the inner corners.
+    - Find chessboard corners in each image.
+    - Refine corners with cornerSubPix.
+    - Call cv2.calibrateCamera.
+    - Save intrinsic matrix and distortion coefficients.
+  tags:
+    - vision
+    - camera-calibration
+    - opencv
+  verified: true
+
+- name: Undistort an image
+  preconditions:
+    - You have calibrated the camera and have distortion coefficients.
+  procedure:
+    - Compute undistortion maps with initUndistortRectifyMap.
+    - Apply remap to the image.
+    - Verify straight lines appear straight.
+  tags:
+    - vision
+    - camera-calibration
+    - distortion
+  verified: true
+
+- name: Compute optical flow between frames
+  preconditions:
+    - You have two consecutive video frames.
+  procedure:
+    - Convert both frames to grayscale.
+    - Call cv2.calcOpticalFlowFarneback or calcOpticalFlowPyrLK.
+    - Visualize flow using HSV color coding.
+  tags:
+    - vision
+    - optical-flow
+    - video
+  verified: true
+
+- name: Background subtraction for motion detection
+  preconditions:
+    - You have a static camera and want to detect moving objects.
+  procedure:
+    - Create a background subtractor (MOG2 or KNN).
+    - Apply each frame to update the model and get foreground mask.
+    - Clean the mask with morphology.
+    - Find contours to get moving objects.
+  tags:
+    - vision
+    - background-subtraction
+    - motion-detection
+  verified: true
+
+- name: Generate image thumbnails
+  preconditions:
+    - You want small preview images preserving aspect ratio.
+  procedure:
+    - Open the image with Pillow.
+    - Call thumbnail with max size.
+    - Save in a web-friendly format.
+  tags:
+    - vision
+    - pillow
+    - thumbnail
+  verified: true
+
+- name: Add a watermark to an image
+  preconditions:
+    - You want to overlay text or a logo with transparency.
+  procedure:
+    - Convert the image to RGBA.
+    - Create an overlay with the watermark.
+    - Use alpha_composite to blend.
+    - Convert back to the desired output mode.
+  tags:
+    - vision
+    - pillow
+    - watermark
+  verified: true
+
+- name: Create a training dataset manifest
+  preconditions:
+    - You need to track image paths, labels, and metadata.
+  procedure:
+    - Walk the dataset directory.
+    - Record relative paths and labels.
+    - Save as JSON or CSV.
+    - Version the manifest with the dataset.
+  tags:
+    - vision
+    - dataset
+    - metadata
+  verified: true
+
+- name: Deduplicate images by perceptual hash
+  preconditions:
+    - You suspect duplicate or near-duplicate images in a dataset.
+  procedure:
+    - Compute imagehash for each image.
+    - Group images with identical or similar hashes.
+    - Review and remove duplicates.
+  tags:
+    - vision
+    - dataset
+    - deduplication
+  verified: true
+
+- name: Compute image quality metrics
+  preconditions:
+    - You want to compare a processed image to a reference.
+  procedure:
+    - Compute MSE, PSNR, and SSIM.
+    - Use skimage.metrics for SSIM and PSNR.
+    - Ensure both images have the same shape and value range.
+  tags:
+    - vision
+    - metrics
+    - quality
+  verified: true
+
+- name: Implement test-time augmentation
+  preconditions:
+    - You want more robust predictions at inference.
+  procedure:
+    - Define a set of deterministic augmentations (flips, rotations).
+    - Run inference on each augmented view.
+    - Average or vote on predictions.
+  tags:
+    - vision
+    - inference
+    - augmentation
+  verified: true
+
+- name: Use mixed precision training
+  preconditions:
+    - You want faster training and lower memory on modern GPUs.
+  procedure:
+    - Wrap forward pass with torch.cuda.amp.autocast.
+    - Use GradScaler for loss scaling.
+    - Call scaler.step and scaler.update.
+  tags:
+    - vision
+    - training
+    - optimization
+    - pytorch
+  verified: true
+
+- name: Freeze backbone for transfer learning
+  preconditions:
+    - You are fine-tuning a pretrained model on a small dataset.
+  procedure:
+    - Load pretrained model.
+    - Set requires_grad=False for backbone parameters.
+    - Replace the classification head.
+    - Train the head first, then optionally unfreeze layers.
+  tags:
+    - vision
+    - transfer-learning
+    - training
+  verified: true
+
+- name: Implement early stopping
+  preconditions:
+    - You want to stop training when validation metric stops improving.
+  procedure:
+    - Track best validation score.
+    - Increment patience counter when no improvement.
+    - Stop when patience is exceeded.
+    - Optionally restore best weights.
+  tags:
+    - vision
+    - training
+    - regularization
+  verified: true
+
+- name: Deploy a vision model behind an API
+  preconditions:
+    - You need to serve predictions over HTTP.
+  procedure:
+    - Use FastAPI or Flask.
+    - Validate uploaded file size and type.
+    - Apply the same preprocessing as training.
+    - Run inference and return structured results.
+    - Handle errors gracefully.
+  tags:
+    - vision
+    - deployment
+    - api
+  verified: true
+
+- name: Sanitize production image inputs
+  preconditions:
+    - Users can upload images to your service.
+  procedure:
+    - Limit file size and image dimensions.
+    - Validate format by content, not extension.
+    - Strip metadata before storage.
+    - Run decoding in a sandboxed or resource-limited environment.
+  tags:
+    - vision
+    - security
+    - production
+  verified: true
+
+- name: Version preprocessing with model checkpoints
+  preconditions:
+    - You need to avoid train/serve skew.
+  procedure:
+    - Save preprocessing config alongside the model.
+    - Load the same config during inference.
+    - Document input size, normalization, color space, and augmentations.
+  tags:
+    - vision
+    - reproducibility
+    - deployment
+  verified: true
+
+- name: Profile GPU memory usage
+  preconditions:
+    - You are running out of CUDA memory during training or inference.
+  procedure:
+    - Monitor nvidia-smi or torch.cuda.memory_summary.
+    - Reduce batch size or image resolution.
+    - Use torch.cuda.empty_cache between epochs if needed.
+    - Enable gradient checkpointing or mixed precision.
+  tags:
+    - vision
+    - performance
+    - gpu
+  verified: true
+
+- name: Use a streaming generator for large video files
+  preconditions:
+    - The video is too large to load into memory.
+  procedure:
+    - Open VideoCapture.
+    - Yield one processed frame at a time.
+    - Release capture in a finally block.
+  tags:
+    - vision
+    - video
+    - streaming
+    - memory
+  verified: true
+
+- name: Tile a large image for processing
+  preconditions:
+    - The image is too large to process at once.
+  procedure:
+    - Split image into overlapping tiles.
+    - Process each tile independently.
+    - Blend overlapping regions.
+    - Reconstruct the full output.
+  tags:
+    - vision
+    - large-images
+    - tiling
+  verified: true
+
+- name: Convert label mask to color visualization
+  preconditions:
+    - You want to visually inspect a segmentation mask.
+  procedure:
+    - Define a color palette mapping class IDs to RGB.
+    - Create an empty color image.
+    - Assign colors based on mask values.
+    - Overlay on the original image if desired.
+  tags:
+    - vision
+    - segmentation
+    - visualization
+  verified: true
+
+- name: Apply Grad-CAM for model interpretability
+  preconditions:
+    - You want to visualize which regions influence a classification decision.
+  procedure:
+    - Select the target convolutional layer.
+    - Compute gradients of the target class score with respect to the layer output.
+    - Global average pool gradients to get weights.
+    - Compute weighted sum of feature maps and apply ReLU.
+    - Overlay heatmap on the input image.
+  tags:
+    - vision
+    - interpretability
+    - deep-learning
+  verified: true
+
+- name: Detect blurry images
+  preconditions:
+    - You want to filter out-of-focus images from a dataset.
+  procedure:
+    - Convert to grayscale.
+    - Compute Laplacian variance.
+    - Compare to a threshold.
+    - Flag images below the threshold.
+  tags:
+    - vision
+    - quality
+    - filtering
+  verified: true
+
+- name: Align images with homography
+  preconditions:
+    - You have two images of the same scene from different viewpoints.
+  procedure:
+    - Detect features in both images.
+    - Match descriptors and filter with ratio test.
+    - Estimate homography with RANSAC.
+    - Warp one image onto the coordinate system of the other.
+  tags:
+    - vision
+    - alignment
+    - homography
+  verified: true
+
+- name: Stitch images into a panorama
+  preconditions:
+    - You have overlapping images that should form a panorama.
+  procedure:
+    - Use cv2.Stitcher.create.
+    - Pass images to stitcher.stitch.
+    - Check status for success.
+    - Crop black borders if present.
+  tags:
+    - vision
+    - panorama
+    - stitching
+  verified: true
+
+- name: Compute and visualize image histograms
+  preconditions:
+    - You need to analyze pixel value distributions.
+  procedure:
+    - Compute histogram per channel.
+    - Plot with matplotlib.
+    - Identify clipping, underexposure, or color casts.
+  tags:
+    - vision
+    - histogram
+    - analysis
+  verified: true
+
+- name: Apply CLAHE for local contrast enhancement
+  preconditions:
+    - Global histogram equalization over-amplifies noise.
+  procedure:
+    - Create CLAHE object with clip limit and tile grid.
+    - Apply to grayscale image.
+    - Tune clip limit to balance contrast and noise.
+  tags:
+    - vision
+    - contrast
+    - enhancement
+  verified: true
+
+- name: Remove small objects from a binary mask
+  preconditions:
+    - You have noise specks in a segmentation mask.
+  procedure:
+    - Use skimage.morphology.remove_small_objects.
+    - Set a minimum area threshold.
+    - Verify large objects are preserved.
+  tags:
+    - vision
+    - morphology
+    - segmentation
+  verified: true
+
+- name: Skeletonize a binary shape
+  preconditions:
+    - You want a 1-pixel-wide representation of a shape.
+  procedure:
+    - Ensure mask is boolean.
+    - Call skimage.morphology.skeletonize.
+    - Visualize result on the original image.
+  tags:
+    - vision
+    - morphology
+    - shape-analysis
+  verified: true
+
+- name: Resize an image with high-quality resampling
+  preconditions:
+    - You need the best visual quality and can accept slower processing.
+  procedure:
+    - Use PIL Image.Resampling.LANCZOS for downscaling and upscaling.
+    - Or use cv2.INTER_LANCZOS4 in OpenCV.
+    - Compare output to bicubic and bilinear.
+  tags:
+    - vision
+    - resize
+    - quality
+  verified: true
+
+- name: Convert raw camera images to RGB
+  preconditions:
+    - You have a RAW or DNG file from a camera.
+  procedure:
+    - Use rawpy or imageio to read raw data.
+    - Apply demosaicing and post-processing.
+    - Save or display the resulting RGB image.
+  tags:
+    - vision
+    - raw
+    - demosaicing
+  verified: true
+
+- name: Read DICOM medical images
+  preconditions:
+    - You are working with medical imaging data.
+  procedure:
+    - Use pydicom or SimpleITK to read the file.
+    - Extract pixel array and metadata.
+    - Apply windowing for visualization.
+  tags:
+    - vision
+    - medical-imaging
+    - dicom
+  verified: true
+
+- name: Handle anisotropic scaling in medical images
+  preconditions:
+    - Voxel spacing differs between axes.
+  procedure:
+    - Read spacing metadata.
+    - Resample to isotropic spacing if required by the model.
+    - Update affine matrix accordingly.
+  tags:
+    - vision
+    - medical-imaging
+    - resampling
+  verified: true
+
+- name: Use imageio for multi-format I/O
+  preconditions:
+    - You want a unified API for reading various image formats.
+  procedure:
+    - Import imageio.v3 as iio.
+    - Use iio.imread to get a NumPy array.
+    - Use iio.imwrite to save.
+    - Use iio.immeta for metadata.
+  tags:
+    - vision
+    - imageio
+    - io
+  verified: true
+
+- name: Work with transparent PNG images
+  preconditions:
+    - You need to preserve or composite alpha channels.
+  procedure:
+    - Load as RGBA.
+    - Split alpha channel if needed.
+    - Composite over a background using alpha blending.
+    - Convert to RGB only when saving to formats without alpha.
+  tags:
+    - vision
+    - alpha
+    - transparency
+  verified: true
+
+- name: Implement a custom PyTorch Dataset for images
+  preconditions:
+    - You want to load images lazily during training.
+  procedure:
+    - Subclass torch.utils.data.Dataset.
+    - Implement __len__ and __getitem__.
+    - Load and transform images in __getitem__.
+    - Return image and label.
+  tags:
+    - vision
+    - pytorch
+    - dataset
+  verified: true
+
+- name: Use WeightedRandomSampler for imbalanced classes
+  preconditions:
+    - Some classes are underrepresented in the dataset.
+  procedure:
+    - Compute class weights inversely proportional to frequency.
+    - Assign a weight to each sample.
+    - Create WeightedRandomSampler and pass to DataLoader.
+  tags:
+    - vision
+    - pytorch
+    - imbalance
+  verified: true
+
+- name: Implement gradient accumulation
+  preconditions:
+    - You want a large effective batch size with limited GPU memory.
+  procedure:
+    - Divide loss by accumulation steps.
+    - Call loss.backward each step.
+    - Only call optimizer.step and zero_grad every N steps.
+  tags:
+    - vision
+    - training
+    - optimization
+    - pytorch
+  verified: true
+
+- name: Use learning rate scheduling
+  preconditions:
+    - You want to improve convergence and final performance.
+  procedure:
+    - Choose a scheduler (StepLR, CosineAnnealingLR, ReduceLROnPlateau).
+    - Attach to optimizer.
+    - Call scheduler.step at the right time (per epoch or per batch).
+  tags:
+    - vision
+    - training
+    - optimization
+  verified: true
+
+- name: Log training metrics
+  preconditions:
+    - You want to track experiment progress.
+  procedure:
+    - Use TensorBoard, Weights & Biases, or MLflow.
+    - Log loss and metrics each step/epoch.
+    - Log hyperparameters and model config.
+    - Visualize sample predictions periodically.
+  tags:
+    - vision
+    - training
+    - logging
+  verified: true
+
+- name: Perform hyperparameter search
+  preconditions:
+    - You want to optimize model or training settings.
+  procedure:
+    - Define search space.
+    - Use Optuna, Ray Tune, or grid search.
+    - Evaluate validation metric for each trial.
+    - Save best hyperparameters.
+  tags:
+    - vision
+    - training
+    - hyperparameters
+  verified: true
+
+- name: Create a confusion matrix for classification
+  preconditions:
+    - You have model predictions and ground-truth labels.
+  procedure:
+    - Compute predictions from logits or probabilities.
+    - Use sklearn.metrics.confusion_matrix.
+    - Plot with seaborn or matplotlib.
+    - Analyze misclassified classes.
+  tags:
+    - vision
+    - classification
+    - evaluation
+  verified: true
+
+- name: Plot precision-recall curve
+  preconditions:
+    - You have prediction scores and binary labels.
+  procedure:
+    - Use sklearn.metrics.precision_recall_curve.
+    - Plot precision vs recall.
+    - Compute average precision score.
+  tags:
+    - vision
+    - evaluation
+    - metrics
+  verified: true
+
+- name: Plot ROC curve
+  preconditions:
+    - You have prediction scores and binary labels.
+  procedure:
+    - Use sklearn.metrics.roc_curve and auc.
+    - Plot false positive rate vs true positive rate.
+    - Report AUC.
+  tags:
+    - vision
+    - evaluation
+    - metrics
+  verified: true
+
+- name: Compute mean Average Precision (mAP)
+  preconditions:
+    - You are evaluating object detection.
+  procedure:
+    - Match predictions to ground truth by IoU.
+    - Sort by confidence and compute precision-recall.
+    - Interpolate precision and compute AP per class.
+    - Average AP across classes.
+  tags:
+    - vision
+    - object-detection
+    - evaluation
+  verified: true
+
+- name: Strip EXIF metadata before sharing
+  preconditions:
+    - You are publishing or sharing images.
+  procedure:
+    - Open image with Pillow.
+    - Save without EXIF or with empty exif argument.
+    - Verify sensitive tags are removed.
+  tags:
+    - vision
+    - privacy
+    - metadata
+  verified: true
+
+- name: Validate bounding box annotations
+  preconditions:
+    - You have a detection dataset.
+  procedure:
+    - Check box coordinates are within image bounds.
+    - Ensure x2 > x1 and y2 > y1.
+    - Check class IDs are valid.
+    - Filter or flag invalid boxes.
+  tags:
+    - vision
+    - object-detection
+    - validation
+  verified: true
+
+- name: Convert between bounding box formats
+  preconditions:
+    - Different models or tools use different box formats.
+  procedure:
+    - "xyxy: (x1, y1, x2, y2)."
+    - "xywh: (x1, y1, w, h)."
+    - "cxcywh: (cx, cy, w, h)."
+    - Write conversion functions and test with known examples.
+  tags:
+    - vision
+    - object-detection
+    - coordinates
+  verified: true
+
+- name: Pad an image to a target size
+  preconditions:
+    - You need a fixed-size input for a model.
+  procedure:
+    - Compute padding on each side.
+    - Use cv2.copyMakeBorder or np.pad.
+    - Record padding amounts if you need to undo it later.
+  tags:
+    - vision
+    - preprocessing
+    - padding
+  verified: true
+
+- name: Randomly crop and resize for training
+  preconditions:
+    - You are training a classifier with data augmentation.
+  procedure:
+    - Use RandomResizedCrop with desired scale and ratio.
+    - Apply random horizontal flip.
+    - Normalize according to pretrained model.
+  tags:
+    - vision
+    - augmentation
+    - classification
+  verified: true
+
+- name: Normalize a grayscale image
+  preconditions:
+    - You need zero-mean, unit-variance grayscale input.
+  procedure:
+    - Convert to float32.
+    - Subtract mean and divide by std.
+    - Alternatively scale to [0, 1] or [-1, 1] depending on model.
+  tags:
+    - vision
+    - normalization
+    - grayscale
+  verified: true
+
+- name: Reverse normalization for visualization
+  preconditions:
+    - You have a normalized tensor and want to display it.
+  procedure:
+    - Multiply by std and add mean.
+    - Clip to [0, 1].
+    - Scale to [0, 255] and convert to uint8.
+  tags:
+    - vision
+    - visualization
+    - normalization
+  verified: true
+
+- name: Use torchvision pretrained weights
+  preconditions:
+    - You want to use a standard model architecture.
+  procedure:
+    - Import models from torchvision.
+    - Select weights enum like ResNet50_Weights.IMAGENET1K_V2.
+    - Use the associated transforms.
+  tags:
+    - vision
+    - pytorch
+    - pretrained
+  verified: true
+
+- name: Load a Hugging Face vision model
+  preconditions:
+    - You want to use a transformer-based vision model.
+  procedure:
+    - Import AutoImageProcessor and AutoModel.
+    - Load from a model hub identifier.
+    - Preprocess images with the processor.
+    - Run forward pass.
+  tags:
+    - vision
+    - transformers
+    - huggingface
+  verified: true
+
+- name: Run CLIP zero-shot classification
+  preconditions:
+    - You have text labels and want to classify images without training.
+  procedure:
+    - Load CLIP model and preprocess.
+    - Encode images and text prompts.
+    - Compute similarity logits.
+    - Apply softmax and select highest-scoring label.
+  tags:
+    - vision
+    - clip
+    - zero-shot
+  verified: true
+
+- name: Generate an image with Stable Diffusion
+  preconditions:
+    - You have a text prompt and a GPU.
+  procedure:
+    - Load StableDiffusionPipeline.
+    - Move to CUDA.
+    - Call pipe(prompt, num_inference_steps=50).
+    - Save the generated image.
+  tags:
+    - vision
+    - diffusion
+    - generation
+  verified: true
+
+- name: Run YOLO inference
+  preconditions:
+    - You have an image and a YOLO model.
+  procedure:
+    - Load model with ultralytics.YOLO.
+    - Call model(image).
+    - Extract boxes, classes, and confidences.
+    - Draw results on the image.
+  tags:
+    - vision
+    - yolo
+    - object-detection
+  verified: true
+
+- name: Use OpenCV DNN module for inference
+  preconditions:
+    - You have an ONNX or Caffe model and want a lightweight runtime.
+  procedure:
+    - Read model with cv2.dnn.readNetFromONNX.
+    - Create blob with cv2.dnn.blobFromImage.
+    - Set input and run forward.
+    - Parse outputs according to model documentation.
+  tags:
+    - vision
+    - opencv
+    - dnn
+    - inference
+  verified: true
+
+- name: Quantize a model for edge deployment
+  preconditions:
+    - You need a smaller, faster model for inference.
+  procedure:
+    - Use PyTorch quantization or ONNX quantization tools.
+    - Calibrate with representative data.
+    - Evaluate accuracy after quantization.
+    - Deploy quantized model.
+  tags:
+    - vision
+    - deployment
+    - quantization
+  verified: true
+
+- name: Use TensorRT for GPU inference
+  preconditions:
+    - You have an NVIDIA GPU and want maximum inference speed.
+  procedure:
+    - Convert ONNX model to TensorRT engine.
+    - Allocate bindings and buffers.
+    - Execute inference context.
+    - Parse outputs.
+  tags:
+    - vision
+    - deployment
+    - tensorrt
+    - gpu
+  verified: true
+
+- name: Use ONNX Runtime for cross-platform inference
+  preconditions:
+    - You want portable inference on CPU or GPU.
+  procedure:
+    - Install onnxruntime or onnxruntime-gpu.
+    - Create InferenceSession.
+    - Get input name and run session with numpy input.
+  tags:
+    - vision
+    - deployment
+    - onnx
+  verified: true
+
+- name: Monitor production model predictions
+  preconditions:
+    - You have a deployed vision model.
+  procedure:
+    - Log prediction confidence distributions.
+    - Track input statistics (size, format, anomalies).
+    - Set alerts for drift or low-confidence spikes.
+    - Sample inputs for periodic re-evaluation.
+  tags:
+    - vision
+    - production
+    - monitoring
+  verified: true
+
+- name: Write unit tests for image utilities
+  preconditions:
+    - You want to ensure preprocessing functions behave correctly.
+  procedure:
+    - Generate synthetic test images.
+    - Test expected output shapes and values.
+    - Test edge cases (empty inputs, wrong dtypes).
+    - Use pytest and fixtures.
+  tags:
+    - vision
+    - testing
+    - quality
+  verified: true
+
+- name: Create a reproducible experiment
+  preconditions:
+    - You want others to be able to reproduce your results.
+  procedure:
+    - Pin all dependency versions.
+    - Save hyperparameters and random seeds.
+    - Version dataset and code.
+    - Log training curves and final metrics.
+  tags:
+    - vision
+    - reproducibility
+    - experiment
+  verified: true
+
+- name: Document a vision API
+  preconditions:
+    - You are exposing image processing functionality.
+  procedure:
+    - Specify accepted formats and size limits.
+    - Document color space and normalization assumptions.
+    - Provide example requests and responses.
+    - List error codes.
+  tags:
+    - vision
+    - documentation
+    - api
+  verified: true
+
+- name: Choose the right image format
+  preconditions:
+    - You need to save processed images.
+  procedure:
+    - Use JPEG for photographs where small size matters.
+    - Use PNG for graphics, masks, and transparency.
+    - Use WebP for modern web use.
+    - Use TIFF for high bit depth or archival.
+  tags:
+    - vision
+    - formats
+    - io
+  verified: true
+
+- name: Avoid decompression bombs
+  preconditions:
+    - You process images from untrusted sources.
+  procedure:
+    - Keep Pillow MAX_IMAGE_PIXELS at a reasonable value.
+    - Reject images exceeding dimension or file size limits.
+    - Decode in a resource-limited environment.
+  tags:
+    - vision
+    - security
+    - robustness
+  verified: true
+
+- name: Profile image loading pipeline
+  preconditions:
+    - Data loading is a training bottleneck.
+  procedure:
+    - Time dataset __getitem__.
+    - Adjust num_workers and pin_memory.
+    - Cache decoded tensors if dataset fits in memory.
+    - Use faster image decoders if available.
+  tags:
+    - vision
+    - performance
+    - dataloader
+  verified: true
+
+- name: Clean a noisy dataset
+  preconditions:
+    - Your dataset contains corrupt, duplicate, or mislabeled images.
+  procedure:
+    - Validate every image loads.
+    - Deduplicate with perceptual hashing.
+    - Review label distributions and outliers.
+    - Fix or remove problematic samples.
+  tags:
+    - vision
+    - dataset
+    - cleaning
+  verified: true
+
+- name: Split a dataset without leakage
+  preconditions:
+    - You need train/validation/test sets.
+  procedure:
+    - Group by subject, scene, or source before splitting.
+    - Ensure no near-duplicates across splits.
+    - Stratify by class label when possible.
+    - Save split indices for reproducibility.
+  tags:
+    - vision
+    - dataset
+    - splitting
+  verified: true
+
+- name: Augment a segmentation dataset
+  preconditions:
+    - You have paired images and masks.
+  procedure:
+    - Use Albumentations with additional_targets mask.
+    - Apply spatial transforms to both image and mask.
+    - Keep masks as nearest-neighbor.
+    - Verify class distribution after augmentation.
+  tags:
+    - vision
+    - augmentation
+    - segmentation
+  verified: true
+
+- name: Augment a keypoint dataset
+  preconditions:
+    - You have images with keypoint annotations.
+  procedure:
+    - Use Albumentations with keypoint_params.
+    - Remove invisible keypoints after transforms.
+    - Update visibility flags.
+    - Validate keypoints remain within image bounds.
+  tags:
+    - vision
+    - augmentation
+    - keypoints
+  verified: true
+
+- name: Compute optical character recognition with pytesseract
+  preconditions:
+    - You have an image containing text.
+  procedure:
+    - Install tesseract binary and pytesseract.
+    - Preprocess image (grayscale, denoise, threshold).
+    - Call image_to_string or image_to_data.
+    - Post-process recognized text.
+  tags:
+    - vision
+    - ocr
+    - tesseract
+  verified: true
+
+- name: Use EasyOCR for multilingual text
+  preconditions:
+    - You need OCR for multiple languages.
+  procedure:
+    - Install easyocr.
+    - Create Reader with desired languages.
+    - Call readtext on the image.
+    - Extract bounding boxes, text, and confidence.
+  tags:
+    - vision
+    - ocr
+    - easyocr
+  verified: true
+
+- name: Generate Grad-CAM visualizations
+  preconditions:
+    - You have a CNN classifier and want explanations.
+  procedure:
+    - Choose target layer.
+    - Compute gradients for target class.
+    - Generate class activation heatmap.
+    - Overlay on input image.
+  tags:
+    - vision
+    - interpretability
+    - grad-cam
+  verified: true
+
+- name: Visualize model predictions over a dataset
+  preconditions:
+    - You want to inspect model behavior qualitatively.
+  procedure:
+    - Run inference on a sample set.
+    - Draw predictions and ground truth.
+    - Create a grid or HTML report.
+    - Look for systematic errors.
+  tags:
+    - vision
+    - evaluation
+    - visualization
+  verified: true
+
+- name: Implement a simple image search engine
+  preconditions:
+    - You want to find visually similar images.
+  procedure:
+    - Extract embeddings from a pretrained model or CLIP.
+    - Index embeddings with FAISS or annoy.
+    - Query with an image or text.
+    - Return nearest neighbors.
+  tags:
+    - vision
+    - search
+    - embeddings
+  verified: true
+
+- name: Fine-tune a diffusion model
+  preconditions:
+    - You want to customize a text-to-image model.
+  procedure:
+    - Prepare a dataset of images and captions.
+    - Use DreamBooth, LoRA, or textual inversion.
+    - Fine-tune with limited learning rate.
+    - Generate samples and evaluate.
+  tags:
+    - vision
+    - diffusion
+    - fine-tuning
+  verified: true
+
+- name: Use a vision-language model
+  preconditions:
+    - You need joint understanding of images and text.
+  procedure:
+    - Load a model like LLaVA, BLIP, or GPT-4V.
+    - Provide image and text prompt.
+    - Generate text response.
+    - Validate outputs for your use case.
+  tags:
+    - vision
+    - vision-language
+    - multimodal
+  verified: true
+
+- name: Create a simple image classifier from scratch
+  preconditions:
+    - You have labeled images and want a custom model.
+  procedure:
+    - Organize images into class folders.
+    - Use ImageFolder dataset.
+    - Load a pretrained backbone.
+    - Replace classifier head.
+    - Train and evaluate.
+  tags:
+    - vision
+    - classification
+    - training
+  verified: true
+
+- name: Detect objects with a pretrained Faster R-CNN
+  preconditions:
+    - You need general object detection without custom training.
+  procedure:
+    - Load fasterrcnn_resnet50_fpn with DEFAULT weights.
+    - Preprocess image with torchvision transforms.
+    - Run forward pass.
+    - Filter predictions by score and apply NMS if needed.
+  tags:
+    - vision
+    - object-detection
+    - pytorch
+  verified: true
+
+- name: Segment images with a pretrained Mask R-CNN
+  preconditions:
+    - You need instance segmentation.
+  procedure:
+    - Load maskrcnn_resnet50_fpn.
+    - Preprocess image.
+    - Obtain boxes, labels, scores, and masks.
+    - Visualize masks over the image.
+  tags:
+    - vision
+    - instance-segmentation
+    - pytorch
+  verified: true
+
+- name: Use a semantic segmentation model
+  preconditions:
+    - You need pixel-level class labels.
+  procedure:
+    - Load a model like FCN or DeepLabV3.
+    - Preprocess with the required transforms.
+    - Upsample output logits to original size.
+    - Argmax to get class predictions.
+  tags:
+    - vision
+    - semantic-segmentation
+    - pytorch
+  verified: true
+
+- name: Train a U-Net for segmentation
+  preconditions:
+    - You have paired images and segmentation masks.
+  procedure:
+    - Build or import a U-Net architecture.
+    - Use a segmentation dataset and dataloader.
+    - Choose a suitable loss (cross-entropy, Dice, Focal).
+    - Train with augmentation and validation.
+  tags:
+    - vision
+    - segmentation
+    - training
+    - unet
+  verified: true
+
+- name: Evaluate a segmentation model with mIoU
+  preconditions:
+    - You have predictions and ground-truth masks.
+  procedure:
+    - Compute IoU per class.
+    - Average over classes for mIoU.
+    - Ignore void/ignore labels.
+    - Report per-class IoU for diagnostics.
+  tags:
+    - vision
+    - segmentation
+    - evaluation
+  verified: true
+
+- name: Use MixUp augmentation
+  preconditions:
+    - You want to improve classification generalization.
+  procedure:
+    - Sample lambda from Beta distribution.
+    - Mix two images and labels by lambda.
+    - Compute mixed loss.
+  tags:
+    - vision
+    - augmentation
+    - classification
+    - mixup
+  verified: true
+
+- name: Use CutMix augmentation
+  preconditions:
+    - You want to improve localization and robustness.
+  procedure:
+    - Randomly cut a patch from one image and paste into another.
+    - Adjust labels proportionally by patch area.
+    - Apply only during training.
+  tags:
+    - vision
+    - augmentation
+    - classification
+    - cutmix
+  verified: true
+
+- name: Implement Random Erasing
+  preconditions:
+    - You want to regularize classification models.
+  procedure:
+    - Randomly select a rectangular region.
+    - Fill it with random values, mean, or zeros.
+    - Apply after ToTensor.
+  tags:
+    - vision
+    - augmentation
+    - regularization
+  verified: true
+
+- name: Use AutoAugment or TrivialAugment
+  preconditions:
+    - You want strong augmentation without hand-tuning.
+  procedure:
+    - Use torchvision.transforms.AutoAugment or TrivialAugmentWide.
+    - Apply before normalization.
+    - Monitor training for over-augmentation signs.
+  tags:
+    - vision
+    - augmentation
+    - autoaugment
+  verified: true
+
+- name: Implement label smoothing
+  preconditions:
+    - You want to reduce overconfidence on noisy labels.
+  procedure:
+    - Set label smoothing factor (e.g., 0.1).
+    - Use CrossEntropyLoss with label_smoothing parameter.
+    - Train normally.
+  tags:
+    - vision
+    - training
+    - regularization
+  verified: true
+
+- name: Use Focal Loss for imbalanced detection
+  preconditions:
+    - You have extreme foreground/background imbalance.
+  procedure:
+    - Replace cross-entropy with FocalLoss.
+    - Tune alpha and gamma.
+    - Monitor precision and recall.
+  tags:
+    - vision
+    - training
+    - loss
+    - imbalance
+  verified: true
+
+- name: Implement knowledge distillation
+  preconditions:
+    - You have a large teacher model and want a small student.
+  procedure:
+    - Train teacher or use pretrained teacher.
+    - Compute soft targets from teacher logits.
+    - Train student with distillation loss plus hard-label loss.
+    - Evaluate student accuracy and latency.
+  tags:
+    - vision
+    - training
+    - distillation
+  verified: true
+
+- name: Use progressive resizing
+  preconditions:
+    - You want faster initial training and better final accuracy.
+  procedure:
+    - Start with smaller input resolution.
+    - Increase resolution after several epochs.
+    - Adjust learning rate when changing resolution.
+  tags:
+    - vision
+    - training
+    - optimization
+  verified: true
+
+- name: Use test-time augmentation for robust inference
+  preconditions:
+    - You can afford multiple inference passes per image.
+  procedure:
+    - Define flips and multi-scale crops.
+    - Average softmax probabilities.
+    - Use for final evaluation or critical predictions.
+  tags:
+    - vision
+    - inference
+    - augmentation
+  verified: true
+
+- name: Analyze model errors by class
+  preconditions:
+    - You want to identify weak classes.
+  procedure:
+    - Run inference on validation set.
+    - Compute per-class precision, recall, F1.
+    - Inspect misclassified examples.
+    - Collect more data or adjust class weights for weak classes.
+  tags:
+    - vision
+    - evaluation
+    - error-analysis
+  verified: true
+
+- name: Use class activation mapping for weak localization
+  preconditions:
+    - You want to locate objects using only image labels.
+  procedure:
+    - Train a classifier with global average pooling.
+    - Compute CAM from final weights and feature maps.
+    - Generate localization heatmaps.
+  tags:
+    - vision
+    - localization
+    - interpretability
+  verified: true
+
+- name: Implement a simple image similarity search with embeddings
+  preconditions:
+    - You have a gallery of images and want to find similar ones.
+  procedure:
+    - Extract embeddings with a pretrained model.
+    - Normalize embeddings.
+    - Build an index (FAISS, annoy, scikit-learn).
+    - Query with cosine similarity or Euclidean distance.
+  tags:
+    - vision
+    - embeddings
+    - similarity
+  verified: true
+
+- name: Use Siamese networks for similarity learning
+  preconditions:
+    - You want to learn a similarity metric from pairs or triplets.
+  procedure:
+    - Build a shared-weights encoder.
+    - Use contrastive or triplet loss.
+    - Sample informative pairs/triplets.
+    - Evaluate with retrieval metrics.
+  tags:
+    - vision
+    - metric-learning
+    - similarity
+  verified: true
+
+- name: Use contrastive learning for self-supervised pretraining
+  preconditions:
+    - You have unlabeled images and want representations.
+  procedure:
+    - Generate two augmented views of each image.
+    - Use a contrastive loss (InfoNCE).
+    - Train an encoder.
+    - Fine-tune on downstream tasks.
+  tags:
+    - vision
+    - self-supervised
+    - contrastive-learning
+  verified: true
+
+- name: Use masked autoencoders for pretraining
+  preconditions:
+    - You have large unlabeled image data.
+  procedure:
+    - Mask random patches.
+    - Train a transformer to reconstruct pixels.
+    - Use the encoder for downstream tasks.
+  tags:
+    - vision
+    - self-supervised
+    - transformers
+  verified: true
+
+- name: Convert an image dataset to TFRecord or WebDataset
+  preconditions:
+    - You want efficient streaming for large-scale training.
+  procedure:
+    - Group images into shards.
+    - Serialize with images and labels.
+    - Use a streaming dataloader.
+    - Verify shuffled and balanced shards.
+  tags:
+    - vision
+    - dataset
+    - streaming
+  verified: true
+
+- name: Use webdataset for large-scale image training
+  preconditions:
+    - You have millions of images stored as tar shards.
+  procedure:
+    - Install webdataset.
+    - Create a WebLoader over tar files.
+    - Decode and augment on the fly.
+    - Scale training across nodes.
+  tags:
+    - vision
+    - dataset
+    - large-scale
+  verified: true
+
+- name: Implement active learning for image classification
+  preconditions:
+    - You have many unlabeled images and limited annotation budget.
+  procedure:
+    - Train model on current labeled set.
+    - Compute uncertainty scores for unlabeled pool.
+    - Select most uncertain samples for annotation.
+    - Repeat.
+  tags:
+    - vision
+    - active-learning
+    - annotation
+  verified: true
+
+- name: Use pseudo-labeling for semi-supervised learning
+  preconditions:
+    - You have a small labeled set and large unlabeled set.
+  procedure:
+    - Train on labeled data.
+    - Generate pseudo-labels for unlabeled data above confidence threshold.
+    - Combine labeled and pseudo-labeled data.
+    - Retrain with appropriate class balancing.
+  tags:
+    - vision
+    - semi-supervised
+    - pseudo-labeling
+  verified: true
+
+- name: Domain adaptation for vision models
+  preconditions:
+    - Model trained on source domain performs poorly on target domain.
+  procedure:
+    - Collect target domain images.
+    - Fine-tune with small learning rate.
+    - Or use adversarial/domain-invariant methods.
+    - Evaluate on target domain test set.
+  tags:
+    - vision
+    - domain-adaptation
+    - transfer-learning
+  verified: true
+
+- name: Use synthetic data to augment training
+  preconditions:
+    - Real annotated data is scarce or expensive.
+  procedure:
+    - Generate synthetic images with labels (Blender, Unity, GANs).
+    - Mix synthetic and real data.
+    - Use domain randomization.
+    - Fine-tune on real data.
+  tags:
+    - vision
+    - synthetic-data
+    - augmentation
+  verified: true
+
+- name: Implement model ensembling
+  preconditions:
+    - You have multiple trained models and want better predictions.
+  procedure:
+    - Run inference with each model.
+    - Average probabilities or use majority voting.
+    - Optionally weight by validation performance.
+  tags:
+    - vision
+    - ensemble
+    - inference
+  verified: true
+
+- name: Use snapshot ensembling
+  preconditions:
+    - You want an ensemble from a single training run.
+  procedure:
+    - Save model snapshots at different epochs.
+    - Average predictions from snapshots.
+    - Use cyclic learning rates to promote diversity.
+  tags:
+    - vision
+    - ensemble
+    - training
+  verified: true
+
+- name: Implement stochastic weight averaging
+  preconditions:
+    - You want improved generalization from a single training run.
+  procedure:
+    - Train with standard schedule.
+    - Average weights from later epochs.
+    - Evaluate the averaged model.
+  tags:
+    - vision
+    - optimization
+    - generalization
+  verified: true
+
+- name: Use sharpness-aware minimization
+  preconditions:
+    - You want improved generalization.
+  procedure:
+    - Use SAM optimizer or similar.
+    - Perform adversarial weight perturbation step.
+    - Compute gradient and update.
+  tags:
+    - vision
+    - optimization
+    - generalization
+  verified: true
+
+- name: Optimize inference with ONNX Runtime
+  preconditions:
+    - You have an ONNX model and want fast CPU inference.
+  procedure:
+    - Create InferenceSession with appropriate execution providers.
+    - Batch inputs when possible.
+    - Preprocess efficiently with NumPy.
+    - Profile and optimize graph if needed.
+  tags:
+    - vision
+    - inference
+    - onnx
+    - optimization
+  verified: true
+
+- name: Use OpenVINO for Intel deployment
+  preconditions:
+    - You are deploying on Intel CPU/GPU/VPU.
+  procedure:
+    - Convert model to OpenVINO IR.
+    - Compile model for target device.
+    - Prepare input blobs.
+    - Run inference and parse outputs.
+  tags:
+    - vision
+    - deployment
+    - openvino
+    - intel
+  verified: true
+
+- name: Use CoreML for Apple deployment
+  preconditions:
+    - You are deploying on iOS/macOS.
+  procedure:
+    - Convert PyTorch or ONNX model to CoreML.
+    - Set image preprocessing parameters in the model.
+    - Test on target device.
+    - Optimize for Neural Engine if available.
+  tags:
+    - vision
+    - deployment
+    - coreml
+    - apple
+  verified: true
+
+- name: Use TensorFlow Lite for mobile deployment
+  preconditions:
+    - You are deploying on Android/iOS/embedded.
+  procedure:
+    - Convert model to TFLite.
+    - Apply quantization.
+    - Run inference with TFLite interpreter.
+    - Benchmark on target device.
+  tags:
+    - vision
+    - deployment
+    - tflite
+    - mobile
+  verified: true
+
+- name: Implement a real-time inference pipeline
+  preconditions:
+    - You need to process camera or video frames at high FPS.
+  procedure:
+    - Capture frames in a separate thread.
+    - Preprocess and batch frames.
+    - Run inference with optimized model.
+    - Post-process and render results quickly.
+  tags:
+    - vision
+    - real-time
+    - video
+    - optimization
+  verified: true
+
+- name: Use multi-GPU training with DDP
+  preconditions:
+    - You have multiple GPUs and want faster training.
+  procedure:
+    - Initialize process group.
+    - Wrap model with DistributedDataParallel.
+    - Use DistributedSampler.
+    - Launch with torchrun.
+  tags:
+    - vision
+    - training
+    - distributed
+    - pytorch
+  verified: true
+
+- name: Use mixed precision with gradient scaling
+  preconditions:
+    - You want faster training and lower memory.
+  procedure:
+    - Import GradScaler and autocast.
+    - Wrap forward pass in autocast.
+    - Scale loss and call backward.
+    - Step optimizer and update scaler.
+  tags:
+    - vision
+    - training
+    - mixed-precision
+    - pytorch
+  verified: true
+
+- name: Implement gradient checkpointing
+  preconditions:
+    - You have a large model that does not fit in memory.
+  procedure:
+    - Wrap layers with torch.utils.checkpoint.
+    - Trade computation for memory.
+    - Monitor throughput impact.
+  tags:
+    - vision
+    - training
+    - memory
+    - pytorch
+  verified: true
+
+- name: Use a learning rate finder
+  preconditions:
+    - You want a good initial learning rate.
+  procedure:
+    - Run training with exponentially increasing LR.
+    - Plot loss vs learning rate.
+    - Choose LR at steepest loss decrease.
+  tags:
+    - vision
+    - training
+    - learning-rate
+  verified: true
+
+- name: Use one-cycle learning rate policy
+  preconditions:
+    - You want fast convergence.
+  procedure:
+    - Use OneCycleLR scheduler.
+    - Set max learning rate from LR finder.
+    - Train for fixed epochs.
+  tags:
+    - vision
+    - training
+    - learning-rate
+  verified: true
+
+- name: Implement layer-wise learning rate decay
+  preconditions:
+    - You are fine-tuning a pretrained model.
+  procedure:
+    - Assign lower learning rates to earlier layers.
+    - Use parameter groups in optimizer.
+    - Train with decay schedule.
+  tags:
+    - vision
+    - training
+    - fine-tuning
+    - learning-rate
+  verified: true
+
+- name: Use warmup and cosine decay
+  preconditions:
+    - You want stable early training and smooth convergence.
+  procedure:
+    - Start LR from 0 and linearly warmup.
+    - After warmup, apply cosine annealing.
+    - Use combined scheduler in PyTorch.
+  tags:
+    - vision
+    - training
+    - learning-rate
+  verified: true
+
+- name: Profile GPU utilization
+  preconditions:
+    - You want to ensure efficient GPU usage.
+  procedure:
+    - Monitor GPU utilization with nvidia-smi.
+    - Check for data loading bottlenecks.
+    - Increase batch size or workers if GPU is underutilized.
+  tags:
+    - vision
+    - performance
+    - gpu
+  verified: true
+
+- name: Use NVIDIA DALI for fast data loading
+  preconditions:
+    - Data augmentation is a training bottleneck.
+  procedure:
+    - Build DALI pipeline on GPU.
+    - Decode and augment on GPU.
+    - Feed directly to PyTorch training loop.
+  tags:
+    - vision
+    - performance
+    - dataloader
+    - gpu
+  verified: true
+
+- name: Compress a model with pruning
+  preconditions:
+    - You want a smaller model with minimal accuracy loss.
+  procedure:
+    - Choose pruning strategy (unstructured/structured).
+    - Apply pruning during or after training.
+    - Fine-tune to recover accuracy.
+    - Evaluate speedup on target hardware.
+  tags:
+    - vision
+    - compression
+    - pruning
+  verified: true
+
+- name: Use knowledge distillation for model compression
+  preconditions:
+    - You need a small, fast student model.
+  procedure:
+    - Use a large pretrained teacher.
+    - Train student with soft and hard labels.
+    - Adjust temperature and loss weights.
+    - Evaluate student.
+  tags:
+    - vision
+    - compression
+    - distillation
+  verified: true
+
+- name: Use neural architecture search for efficient models
+  preconditions:
+    - You need a model optimized for specific hardware.
+  procedure:
+    - Define search space.
+    - Use NAS library or hand-designed efficient blocks.
+    - Train supernet or candidate networks.
+    - Select best architecture.
+  tags:
+    - vision
+    - architecture
+    - nas
+  verified: true
+
+- name: Implement continual learning for vision
+  preconditions:
+    - You need to learn new classes without forgetting old ones.
+  procedure:
+    - Use rehearsal, regularization, or parameter isolation.
+    - Store exemplars from previous tasks.
+    - Apply distillation from old model.
+    - Evaluate on all tasks.
+  tags:
+    - vision
+    - continual-learning
+  verified: true
+
+- name: Use federated learning for privacy-preserving vision
+  preconditions:
+    - Data is distributed across clients and cannot be centralized.
+  procedure:
+    - Train local models on each client.
+    - Aggregate model updates on a server.
+    - Use secure aggregation if needed.
+    - Evaluate global model.
+  tags:
+    - vision
+    - federated-learning
+    - privacy
+  verified: true
+
+- name: Implement a simple image captioning model
+  preconditions:
+    - You have image-caption pairs.
+  procedure:
+    - Use CNN encoder and RNN/Transformer decoder.
+    - Precompute image features or fine-tune end-to-end.
+    - Train with cross-entropy on captions.
+    - Generate captions with beam search.
+  tags:
+    - vision
+    - captioning
+    - multimodal
+  verified: true
+
+- name: Use a Vision Transformer for classification
+  preconditions:
+    - You want to use transformer architecture for images.
+  procedure:
+    - Load a ViT model from timm or transformers.
+    - Preprocess images with required resolution.
+    - Fine-tune on target dataset.
+    - Evaluate.
+  tags:
+    - vision
+    - transformers
+    - classification
+  verified: true
+
+- name: Fine-tune a pretrained detection model
+  preconditions:
+    - You have a custom object detection dataset.
+  procedure:
+    - Choose a detector (Faster R-CNN, SSD, RetinaNet).
+    - Replace box predictor heads.
+    - Prepare dataset in required format.
+    - Fine-tune with small learning rate.
+  tags:
+    - vision
+    - object-detection
+    - fine-tuning
+  verified: true
+
+- name: Use Panoptic FPN for panoptic segmentation
+  preconditions:
+    - You need both semantic and instance segmentation.
+  procedure:
+    - Load panoptic_fpn_resnet50_fpn.
+    - Preprocess image.
+    - Obtain panoptic segmentation output.
+    - Map segment IDs to semantic and instance labels.
+  tags:
+    - vision
+    - panoptic-segmentation
+    - pytorch
+  verified: true
+
+- name: Use a keypoint detection model
+  preconditions:
+    - You need to detect human or object keypoints.
+  procedure:
+    - Load a keypoint model like keypointrcnn_resnet50_fpn.
+    - Preprocess image.
+    - Extract keypoints and scores.
+    - Visualize skeleton.
+  tags:
+    - vision
+    - keypoints
+    - pose-estimation
+  verified: true
+
+- name: Implement a simple GAN for image generation
+  preconditions:
+    - You want to generate images from noise.
+  procedure:
+    - Build generator and discriminator networks.
+    - Use binary cross-entropy or Wasserstein loss.
+    - Alternate training generator and discriminator.
+    - Sample and visualize generated images.
+  tags:
+    - vision
+    - gan
+    - generation
+  verified: true
+
+- name: Use StyleGAN for high-quality image generation
+  preconditions:
+    - You want photorealistic generated images.
+  procedure:
+    - Use pretrained StyleGAN2/3 weights.
+    - Sample latent vectors.
+    - Generate images.
+    - Optionally perform latent space edits.
+  tags:
+    - vision
+    - gan
+    - stylegan
+    - generation
+  verified: true
+
+- name: Use NeRF for novel view synthesis
+  preconditions:
+    - You have multi-view images of a scene.
+  procedure:
+    - Estimate camera poses.
+    - Train a NeRF or Gaussian Splatting model.
+    - Render novel views.
+    - Evaluate PSNR/SSIM against held-out views.
+  tags:
+    - vision
+    - nerf
+    - novel-view-synthesis
+  verified: true
+
+- name: Use Gaussian Splatting for real-time rendering
+  preconditions:
+    - You need fast rendering of a 3D scene from images.
+  procedure:
+    - Train 3D Gaussian Splatting from images.
+    - Optimize gaussians.
+    - Render with real-time viewer.
+  tags:
+    - vision
+    - gaussian-splatting
+    - rendering
+  verified: true
+
+- name: Implement image inpainting
+  preconditions:
+    - You want to fill missing regions in an image.
+  procedure:
+    - Create a mask indicating missing regions.
+    - Use cv2.inpaint or a deep inpainting model.
+    - Blend result with original.
+  tags:
+    - vision
+    - inpainting
+    - restoration
+  verified: true
+
+- name: Use super-resolution to upscale images
+  preconditions:
+    - You need higher resolution images.
+  procedure:
+    - Use a pretrained super-resolution model (ESRGAN, Real-ESRGAN).
+    - Preprocess low-resolution image.
+    - Run inference.
+    - Save or display high-resolution result.
+  tags:
+    - vision
+    - super-resolution
+    - enhancement
+  verified: true
+
+- name: Implement style transfer
+  preconditions:
+    - You want to apply artistic style to a content image.
+  procedure:
+    - Load a style transfer model or implement optimization-based method.
+    - Provide content and style images.
+    - Run optimization or inference.
+    - Save stylized output.
+  tags:
+    - vision
+    - style-transfer
+    - artistic
+  verified: true
+
+- name: Use image-to-image translation
+  preconditions:
+    - You want to translate images from one domain to another.
+  procedure:
+    - Choose a model (Pix2Pix, CycleGAN).
+    - Prepare paired or unpaired data.
+    - Train or use pretrained weights.
+    - Translate new images.
+  tags:
+    - vision
+    - image-translation
+    - gan
+  verified: true
+
+- name: Implement anomaly detection with autoencoders
+  preconditions:
+    - You want to detect unusual images or regions.
+  procedure:
+    - Train an autoencoder on normal images.
+    - Compute reconstruction error.
+    - Flag samples with high error as anomalies.
+  tags:
+    - vision
+    - anomaly-detection
+    - autoencoder
+  verified: true
+
+- name: Use self-supervised pretraining with SimCLR
+  preconditions:
+    - You have unlabeled images.
+  procedure:
+    - Generate augmented views.
+    - Use contrastive loss to maximize agreement between views.
+    - Train encoder.
+    - Fine-tune on downstream tasks.
+  tags:
+    - vision
+    - self-supervised
+    - contrastive-learning
+  verified: true
+
+- name: Use masked image modeling with MAE
+  preconditions:
+    - You have large unlabeled image datasets.
+  procedure:
+    - Mask high proportion of image patches.
+    - Train ViT to reconstruct pixels.
+    - Use encoder representations for downstream tasks.
+  tags:
+    - vision
+    - self-supervised
+    - transformers
+  verified: true
+
+- name: Implement few-shot image classification
+  preconditions:
+    - You have very few labeled examples per class.
+  procedure:
+    - Use meta-learning (Prototypical Networks, MAML).
+    - Or use strong data augmentation and fine-tuning.
+    - Evaluate on novel classes.
+  tags:
+    - vision
+    - few-shot
+    - meta-learning
+  verified: true
+
+- name: Use zero-shot classification with CLIP
+  preconditions:
+    - You want to classify images without task-specific training.
+  procedure:
+    - Load CLIP model.
+    - Encode images and candidate text labels.
+    - Compute similarity.
+    - Predict label with highest similarity.
+  tags:
+    - vision
+    - zero-shot
+    - clip
+  verified: true
+
+- name: Build a visual question answering system
+  preconditions:
+    - You have images and questions about them.
+  procedure:
+    - Use a VQA model (ViLBERT, LXMERT, BLIP).
+    - Preprocess image and question.
+    - Generate answer.
+    - Evaluate against ground truth.
+  tags:
+    - vision
+    - vqa
+    - multimodal
+  verified: true
+
+- name: Use multimodal embeddings for retrieval
+  preconditions:
+    - You want to retrieve images with text queries.
+  procedure:
+    - Use CLIP or ALIGN to encode images and text.
+    - Build a joint embedding index.
+    - Query with text and return top-k images.
+  tags:
+    - vision
+    - retrieval
+    - multimodal
+  verified: true
+
+- name: Implement autonomous data labeling with a teacher model
+  preconditions:
+    - You have a strong teacher model and unlabeled data.
+  procedure:
+    - Run teacher on unlabeled images.
+    - Filter high-confidence predictions.
+    - Treat them as pseudo-labels.
+    - Train a smaller student model.
+  tags:
+    - vision
+    - pseudo-labeling
+    - automation
+  verified: true
+
+- name: Use robustness evaluation for vision models
+  preconditions:
+    - You want to measure model robustness.
+  procedure:
+    - Apply common corruptions (noise, blur, compression).
+    - Apply adversarial perturbations.
+    - Measure accuracy degradation.
+    - Compare across models.
+  tags:
+    - vision
+    - robustness
+    - evaluation
+  verified: true
+
+- name: Implement adversarial training
+  preconditions:
+    - You want to improve robustness to adversarial examples.
+  procedure:
+    - Generate adversarial examples during training.
+    - Use PGD or FGSM attacks.
+    - Train on mixed clean and adversarial data.
+    - Evaluate robustness.
+  tags:
+    - vision
+    - adversarial
+    - training
+  verified: true
+
+- name: Use differential privacy for vision training
+  preconditions:
+    - You need to protect training data privacy.
+  procedure:
+    - Use DP-SGD optimizer.
+    - Set privacy budget (epsilon, delta).
+    - Clip per-sample gradients and add noise.
+    - Evaluate utility-privacy tradeoff.
+  tags:
+    - vision
+    - privacy
+    - differential-privacy
+  verified: true
+
+- name: Implement fair evaluation across demographic groups
+  preconditions:
+    - You want to ensure model fairness.
+  procedure:
+    - Annotate or infer demographic attributes.
+    - Compute metrics per group.
+    - Identify disparity.
+    - Apply fairness-aware training or post-processing.
+  tags:
+    - vision
+    - fairness
+    - evaluation
+  verified: true
+
+- name: Document and share a vision dataset
+  preconditions:
+    - You want to publish or distribute a dataset.
+  procedure:
+    - Create a datasheet describing collection and labels.
+    - Strip privacy-sensitive metadata.
+    - Provide train/val/test splits.
+    - Include license and citation.
+  tags:
+    - vision
+    - dataset
+    - documentation
+  verified: true
+
+- name: Reproduce a vision paper result
+  preconditions:
+    - You want to replicate published results.
+  procedure:
+    - Obtain official code and pretrained weights if available.
+    - Follow exact preprocessing and hyperparameters.
+    - Use the same dataset splits.
+    - Report any discrepancies.
+  tags:
+    - vision
+    - reproducibility
+    - research
+  verified: true
+
+- name: Write a clear vision project README
+  preconditions:
+    - You want others to use your vision project.
+  procedure:
+    - Describe task and model architecture.
+    - List dependencies and installation steps.
+    - Provide training and inference commands.
+    - Include sample inputs and outputs.
+    - Document preprocessing and expected performance.
+  tags:
+    - vision
+    - documentation
+    - project
+  verified: true
+
+- name: Conduct a code review for a vision project
+  preconditions:
+    - You are reviewing image processing or model training code.
+  procedure:
+    - Check color space and dtype conventions.
+    - Verify train/val transform split.
+    - Look for resource leaks (files, VideoCapture).
+    - Validate error handling.
+    - Ensure metrics are computed correctly.
+    - Check for data leakage.
+  tags:
+    - vision
+    - code-review
+    - quality
+  verified: true
+
+- name: Debug a vision training run
+  preconditions:
+    - Training loss is nan, not decreasing, or metrics are poor.
+  procedure:
+    - Verify data loads and labels are correct.
+    - Visualize augmented samples.
+    - Check learning rate and optimizer.
+    - Confirm loss function matches task.
+    - Inspect gradients for explosion/vanishing.
+    - Validate metric computation.
+  tags:
+    - vision
+    - debugging
+    - training
+  verified: true
+
+- name: Optimize an existing image processing pipeline
+  preconditions:
+    - The pipeline is too slow or uses too much memory.
+  procedure:
+    - Profile each stage.
+    - Replace Python loops with vectorized operations.
+    - Use efficient I/O and caching.
+    - Parallelize independent tasks.
+    - Consider moving preprocessing to GPU.
+  tags:
+    - vision
+    - optimization
+    - performance
+  verified: true
+
+- name: Migrate a vision project to a new library version
+  preconditions:
+    - You are upgrading PyTorch, torchvision, OpenCV, etc.
+  procedure:
+    - Read release notes for breaking changes.
+    - Update deprecated APIs.
+    - Re-run tests and benchmarks.
+    - Verify model outputs match within tolerance.
+  tags:
+    - vision
+    - migration
+    - maintenance
+  verified: true
+
+- name: Backup and version model checkpoints
+  preconditions:
+    - You want to preserve training artifacts.
+  procedure:
+    - Save checkpoints with epoch, metrics, and config.
+    - Use semantic versioning or experiment IDs.
+    - Store in durable storage.
+    - Document which checkpoint corresponds to best result.
+  tags:
+    - vision
+    - experiment-management
+    - versioning
+  verified: true
+
+- name: Interpret a failed OpenCV assertion
+  preconditions:
+    - You see cv2.error with an assertion failure.
+  procedure:
+    - Read the error message for the failing function.
+    - Check input shapes, dtypes, and channel counts.
+    - Verify parameters are within valid ranges.
+    - Create a minimal reproduction.
+  tags:
+    - vision
+    - debugging
+    - opencv
+  verified: true
+
+- name: Choose between OpenCV and Pillow for a task
+  preconditions:
+    - You need to decide which library to use.
+  procedure:
+    - Use Pillow for high-level editing, thumbnails, and format handling.
+    - Use OpenCV for array operations, video, and real-time processing.
+    - Use scikit-image for research and scientific workflows.
+    - Use imageio for unified I/O.
+  tags:
+    - vision
+    - tooling
+    - decision
+  verified: true
+
+- name: Set up a reproducible vision development environment
+  preconditions:
+    - You want consistent dependencies across machines.
+  procedure:
+    - Use a virtual environment or container.
+    - Pin requirements.txt or environment.yml.
+    - Install CUDA-compatible PyTorch if using GPU.
+    - Document GPU driver requirements.
+  tags:
+    - vision
+    - environment
+    - setup
+  verified: true
+
+- name: Load a model checkpoint safely
+  preconditions:
+    - You have a saved model and want to resume or deploy.
+  procedure:
+    - Use torch.load with map_location for cross-device loading.
+    - Load state_dict into model, not the whole pickle.
+    - Verify keys match.
+    - Set to eval mode for inference.
+  tags:
+    - vision
+    - deployment
+    - checkpoints
+    - pytorch
+  verified: true
+
+- name: Write a minimal vision inference script
+  preconditions:
+    - You need a standalone script to run a model on new images.
+  procedure:
+    - Parse arguments (image path, model path).
+    - Load model and preprocessing.
+    - Load and preprocess image.
+    - Run inference.
+    - Print or save results.
+  tags:
+    - vision
+    - inference
+    - scripting
+  verified: true
+
+- name: Create a benchmark suite for image models
+  preconditions:
+    - You want to compare models on speed and accuracy.
+  procedure:
+    - Define fixed input sizes and warm-up iterations.
+    - Measure latency and throughput.
+    - Compute accuracy on a standard dataset.
+    - Report mean and standard deviation.
+  tags:
+    - vision
+    - benchmarking
+    - evaluation
+  verified: true
+
+- name: Document image preprocessing assumptions
+  preconditions:
+    - You are handoff off a model or dataset to another developer.
+  procedure:
+    - State input size, color space, and format.
+    - Document normalization values.
+    - List augmentations and when they are applied.
+    - Provide code snippet for preprocessing.
+  tags:
+    - vision
+    - documentation
+    - preprocessing
+  verified: true
+
+- name: Validate a model before deployment
+  preconditions:
+    - You want to ensure the model works in production.
+  procedure:
+    - Run unit tests on preprocessing and post-processing.
+    - Evaluate on a held-out test set.
+    - Test with representative production inputs.
+    - Check latency and memory usage.
+    - Verify numerical stability.
+  tags:
+    - vision
+    - deployment
+    - validation
+  verified: true
+
+- name: Implement rollback for a deployed vision model
+  preconditions:
+    - You need to revert a bad model update.
+  procedure:
+    - Keep previous model checkpoint and config.
+    - Use blue/green or canary deployment.
+    - Monitor metrics after rollout.
+    - Roll back if metrics degrade.
+  tags:
+    - vision
+    - deployment
+    - operations
+  verified: true
+
+- name: Monitor data drift in production
+  preconditions:
+    - Production images may change over time.
+  procedure:
+    - Track input statistics (brightness, color distribution).
+    - Compare embeddings to training distribution.
+    - Set alerts for significant drift.
+    - Plan retraining when drift is detected.
+  tags:
+    - vision
+    - monitoring
+    - drift
+  verified: true
+
+- name: Plan a vision model retraining cycle
+  preconditions:
+    - Model performance has degraded or new data is available.
+  procedure:
+    - Collect and validate new data.
+    - Merge with existing data and re-split.
+    - Retrain from scratch or fine-tune.
+    - Evaluate against previous model and baseline.
+    - Update deployed model if improved.
+  tags:
+    - vision
+    - retraining
+    - operations
+  verified: true
+
+- name: Communicate vision model limitations
+  preconditions:
+    - You need to document what a model can and cannot do.
+  procedure:
+    - State training data distribution.
+    - List known failure modes.
+    - Specify input requirements.
+    - Provide confidence calibration information.
+    - Include safety and fairness caveats.
+  tags:
+    - vision
+    - documentation
+    - ethics
+  verified: true

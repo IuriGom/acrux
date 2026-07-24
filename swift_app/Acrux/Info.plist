@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>Acrux</string>
+    <key>CFBundleIconFile</key>
+    <string>Acrux</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.acrux.app</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Acrux</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <false/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Acrux needs access to Calendar to add assistant messages as events.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>Acrux needs access to Reminders to create reminders from assistant messages.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Acrux uses speech recognition to turn your voice into text messages.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Acrux needs microphone access to listen while you dictate messages.</string>
+</dict>
+</plist>

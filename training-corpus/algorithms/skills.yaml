@@ -1,0 +1,147 @@
+- name: choose_sorting_algorithm
+  preconditions:
+    - Need to sort a collection
+    - Want to pick the right algorithm for the data size and distribution
+  procedure:
+    - For small arrays (n < 50), use insertion sort or shell sort
+    - For general purpose, use quicksort or introsort
+    - For stable sorting, use mergesort or timsort
+    - When range is known and small, consider counting sort
+    - For uniform distribution, bucket sort may be optimal
+    - For digit/character strings, use radix sort
+  tags:
+    - algorithms
+    - sorting
+  verified: true
+
+- name: implement_binary_search
+  preconditions:
+    - Array is sorted
+    - Need O(log n) lookup
+  procedure:
+    - Initialize low = 0, high = len(array) - 1
+    - While low <= high, compute mid = (low + high) // 2
+    - If target == array[mid], return mid
+    - If target < array[mid], set high = mid - 1
+    - Else set low = mid + 1
+    - Return not found indicator
+  tags:
+    - algorithms
+    - searching
+  verified: true
+
+- name: detect_cycle_in_linked_list
+  preconditions:
+    - Working with a linked list
+    - Need to detect a cycle
+  procedure:
+    - Use Floyd's cycle-finding algorithm
+    - Initialize slow and fast pointers at head
+    - Move slow by one and fast by two each step
+    - If they meet, a cycle exists
+    - To find cycle start, reset one pointer to head and advance both by one until they meet
+  tags:
+    - algorithms
+    - linked-list
+  verified: true
+
+- name: choose_hash_table_over_tree
+  preconditions:
+    - Need key-value storage
+    - Ordering is not required
+  procedure:
+    - Use a hash table for average O(1) insert/lookup/delete
+    - Ensure a good hash function to minimize collisions
+    - Resize table when load factor exceeds 0.7
+    - Use separate chaining or open addressing for collision resolution
+  tags:
+    - algorithms
+    - hash-table
+  verified: true
+
+- name: solve_dynamic_programming_problem
+  preconditions:
+    - Problem has overlapping subproblems
+    - Problem has optimal substructure
+  procedure:
+    - Define state that captures subproblem
+    - Write recurrence relation
+    - Identify base cases
+    - Choose top-down memoization or bottom-up tabulation
+    - Reconstruct solution if path is needed
+  tags:
+    - algorithms
+    - dynamic-programming
+  verified: true
+
+- name: traverse_graph_bfs
+  preconditions:
+    - Need shortest path in unweighted graph
+    - Need level-order traversal
+  procedure:
+    - Use a queue starting from source node
+    - Mark nodes as visited
+    - Dequeue node, enqueue unvisited neighbors
+    - Track distance/parent if needed
+  tags:
+    - algorithms
+    - graph
+    - bfs
+  verified: true
+
+- name: traverse_graph_dfs
+  preconditions:
+    - Need to explore all reachable nodes
+    - Need topological sort or cycle detection
+  procedure:
+    - Use recursion or explicit stack
+    - Mark nodes as visited
+    - Explore each neighbor before backtracking
+    - Use timestamps for cycle detection in directed graphs
+  tags:
+    - algorithms
+    - graph
+    - dfs
+  verified: true
+
+- name: compute_shortest_path_weighted
+  preconditions:
+    - Weighted graph with non-negative edges
+  procedure:
+    - Use Dijkstra's algorithm with a priority queue
+    - Initialize distances to infinity, source to 0
+    - Relax edges and update distances
+    - Stop when target is popped or queue is empty
+  tags:
+    - algorithms
+    - graph
+    - dijkstra
+  verified: true
+
+- name: compute_minimum_spanning_tree
+  preconditions:
+    - Connected weighted undirected graph
+  procedure:
+    - Use Kruskal's with union-find, sorting edges by weight
+    - Or use Prim's with a priority queue from an arbitrary start
+    - Add edges/vertices that do not form a cycle
+    - Stop when all vertices are included
+  tags:
+    - algorithms
+    - graph
+    - mst
+  verified: true
+
+- name: pick_greedy_algorithm
+  preconditions:
+    - Problem asks for maximum/minimum with local choices
+    - Greedy choice property holds
+  procedure:
+    - Sort or prioritize inputs by a heuristic
+    - Make locally optimal choice at each step
+    - Prove or test that local optima lead to global optimum
+    - Be cautious when greedy does not apply
+  tags:
+    - algorithms
+    - greedy
+  verified: true

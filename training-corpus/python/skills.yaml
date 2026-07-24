@@ -1,0 +1,132 @@
+- name: write_pythonic_loop
+  preconditions:
+    - Iterating over data in Python
+  procedure:
+    - Prefer 'for item in iterable' over index loops
+    - Use 'enumerate()' when index is needed
+    - Use 'zip()' to iterate multiple sequences
+    - Use list/dict/set comprehensions for simple transforms
+    - Use 'items()' when iterating dictionaries
+  tags:
+    - python
+    - idioms
+  verified: true
+
+- name: handle_python_exceptions
+  preconditions:
+    - Python code may raise exceptions
+  procedure:
+    - Catch specific exceptions, not bare 'except:'
+    - Use 'try/except/else/finally' appropriately
+    - Use context managers ('with') for resource cleanup
+    - Avoid swallowing exceptions silently
+  tags:
+    - python
+    - error-handling
+  verified: true
+
+- name: manage_python_dependencies
+  preconditions:
+    - Setting up or maintaining a Python project
+  procedure:
+    - Pin dependencies in requirements.txt or pyproject.toml
+    - Use virtual environments
+    - Prefer 'uv', 'poetry', or 'pip-tools' for resolution
+    - Keep lockfiles under version control
+    - Separate dev and production dependencies
+  tags:
+    - python
+    - packaging
+  verified: true
+
+- name: write_python_tests
+  preconditions:
+    - Testing Python code
+  procedure:
+    - Use 'pytest' as the test runner
+    - Name files 'test_*.py' and functions 'test_*'
+    - Use fixtures for shared setup
+    - Parametrize tests for multiple cases
+    - Mock external dependencies with 'unittest.mock' or 'pytest-mock'
+  tags:
+    - python
+    - testing
+  verified: true
+
+- name: use_python_type_hints
+  preconditions:
+    - Writing maintainable Python
+  procedure:
+    - Add type hints to function signatures
+    - Use 'typing' generics for collections
+    - Run 'mypy' or 'pyright' in CI
+    - Avoid 'Any' when possible
+  tags:
+    - python
+    - typing
+  verified: true
+
+- name: parse_json_in_python
+  preconditions:
+    - Working with JSON in Python
+  procedure:
+    - Use 'json.loads()' for strings, 'json.dumps()' for serialization
+    - Use 'json.load()'/'json.dump()' for file objects
+    - Specify 'indent' for pretty printing
+    - Handle 'JSONDecodeError' on invalid input
+  tags:
+    - python
+    - json
+  verified: true
+
+- name: read_write_files_python
+  preconditions:
+    - File I/O in Python
+  procedure:
+    - Use 'with open(...) as f:' to ensure files close
+    - Use 'pathlib.Path' for path manipulation
+    - Specify encoding, usually 'utf-8'
+    - Use 'csv' module for CSV, not manual splitting
+  tags:
+    - python
+    - file-io
+  verified: true
+
+- name: profile_python_code
+  preconditions:
+    - Python code is slow
+  procedure:
+    - Use 'cProfile' or 'py-spy' to find hotspots
+    - Look at call counts and cumulative time
+    - Optimize data structures and algorithms first
+    - Consider 'lru_cache', vectorization, or C extensions
+  tags:
+    - python
+    - performance
+  verified: true
+
+- name: write_python_dataclass
+  preconditions:
+    - Need a simple data container in Python
+  procedure:
+    - Use '@dataclass' from 'dataclasses'
+    - Add type hints for fields
+    - Use 'frozen=True' for immutability
+    - Use '__post_init__' for validation
+  tags:
+    - python
+    - dataclasses
+  verified: true
+
+- name: scrape_web_page_python
+  preconditions:
+    - Need to fetch or parse web content in Python
+  procedure:
+    - Use 'httpx' or 'requests' for HTTP
+    - Use 'BeautifulSoup' for HTML parsing
+    - Respect robots.txt and rate limits
+    - Cache results to avoid repeated requests
+  tags:
+    - python
+    - web-scraping
+  verified: true

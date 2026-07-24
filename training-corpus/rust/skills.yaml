@@ -1,0 +1,608 @@
+- name: Create a new Rust project with Cargo
+  preconditions:
+    - Rust toolchain is installed via rustup
+    - You need a binary or library crate
+  procedure:
+    - >
+      Decide whether the crate is a binary ('cargo new name') or a library ('cargo new --lib name').
+    - >
+      Open 'Cargo.toml' and set 'edition = "2024"', add metadata, and list dependencies.
+    - >
+      Verify with 'cargo check' and 'cargo test'.
+    - >
+      Run 'cargo run' for binaries or 'cargo test' for libraries.
+  tags:
+    - rust
+    - cargo
+    - setup
+  verified: true
+
+- name: Handle recoverable errors with Result and '?'
+  preconditions:
+    - A function can fail and its caller should decide the response
+    - You are using Rust 1.90+ with edition 2024
+  procedure:
+    - >
+      Return 'Result<T, E>' where 'E' implements 'std::error::Error'.
+    - >
+      Append '?' to any expression that returns a 'Result' or 'Option' you want to propagate.
+    - >
+      Convert error types using 'From', 'Into', '.map_err()', or the 'thiserror'/'anyhow' crates.
+    - >
+      Document '# Errors' for public functions.
+  tags:
+    - rust
+    - error-handling
+    - result
+  verified: true
+
+- name: Implement a custom trait
+  preconditions:
+    - You want to define shared behavior across multiple types
+  procedure:
+    - >
+      Declare the trait with methods, associated types, or constants.
+    - >
+      Write 'impl Trait for Type' blocks for each concrete type.
+    - >
+      Add trait bounds ('T: Trait') where consumers need the behavior.
+    - >
+      Test implementations and consider object safety if 'dyn Trait' is needed.
+  tags:
+    - rust
+    - traits
+    - generics
+  verified: true
+
+- name: Write idiomatic iterator chains
+  preconditions:
+    - You are transforming, filtering, or aggregating a collection
+  procedure:
+    - >
+      Start from an iterator source: 'iter()', 'iter_mut()', 'into_iter()', or a range.
+    - >
+      Chain adapters such as 'map', 'filter', 'filter_map', 'fold', 'try_fold', 'partition', or 'collect'.
+    - >
+      Avoid intermediate 'Vec' allocations when a single chain suffices.
+    - >
+      Use 'copied()' for 'Copy' types instead of 'cloned()'.
+    - >
+      Verify the chain compiles and passes tests.
+  tags:
+    - rust
+    - iterators
+    - collections
+  verified: true
+
+- name: Set up an async runtime with Tokio
+  preconditions:
+    - The program performs I/O, networking, or concurrency
+    - Tokio is listed as a dependency
+  procedure:
+    - >
+      Add 'tokio = { version = "1", features = ["full"] }' to 'Cargo.toml'.
+    - >
+      Annotiate 'main' with '#[tokio::main]'.
+    - >
+      Write 'async fn' handlers and '.await' futures.
+    - >
+      Spawn independent work with 'tokio::spawn'.
+    - >
+      Run 'cargo run' and 'cargo test' with '#[tokio::test]' for async tests.
+  tags:
+    - rust
+    - async
+    - tokio
+    - concurrency
+  verified: true
+
+- name: Use shared mutable state across threads
+  preconditions:
+    - Multiple threads must read and write the same data
+  procedure:
+    - >
+      Wrap shared data in 'Arc<Mutex<T>>' (or 'Arc<RwLock<T>>' for read-heavy access).
+    - >
+      Clone the 'Arc' for each thread or async task.
+    - >
+      Acquire the lock, do the work, and drop the guard quickly.
+    - >
+      In async code use 'tokio::sync::Mutex', never 'std::sync::Mutex' across '.await'.
+    - >
+      Avoid deadlocks by acquiring locks in a consistent order.
+  tags:
+    - rust
+    - concurrency
+    - synchronization
+  verified: true
+
+- name: Parse and serialize JSON with serde
+  preconditions:
+    - You need to convert Rust structs to/from JSON
+  procedure:
+    - >
+      Add 'serde = { version = "1", features = ["derive"] }' and 'serde_json' to dependencies.
+    - >
+      Derive 'Serialize' and/or 'Deserialize' on data types.
+    - >
+      Use 'serde_json::to_string', 'to_string_pretty', or 'from_str'.
+    - >
+      Add '#[serde(rename)]', '#[serde(default)]', or '#[serde(deny_unknown_fields)]' as needed.
+    - >
+      Test round-trips and error handling.
+  tags:
+    - rust
+    - serde
+    - json
+    - serialization
+  verified: true
+
+- name: Build a CLI with clap
+  preconditions:
+    - You are building a command-line tool
+  procedure:
+    - >
+      Add 'clap = { version = "4", features = ["derive"] }'.
+    - >
+      Define a struct deriving 'Parser' with '#[command(...)]' attributes.
+    - >
+      Add fields annotated with '#[arg(short, long, default_value, ...)]'.
+    - >
+      Call 'Cli::parse()' in 'main' and dispatch on the parsed arguments.
+    - >
+      Run 'cargo run -- --help' to verify.
+  tags:
+    - rust
+    - cli
+    - clap
+  verified: true
+
+- name: Write unit and integration tests
+  preconditions:
+    - You need to verify behavior of library or binary code
+  procedure:
+    - >
+      Add '#[cfg(test)] mod tests' with '#[test]' functions for unit tests.
+    - >
+      Place integration tests in 'tests/*.rs' exercising the public API.
+    - >
+      Use 'assert_eq!', 'assert_ne!', 'assert!', and 'assert_matches!'.
+    - >
+      Add '#[should_panic(expected = "...")]' for expected panics.
+    - >
+      Run 'cargo test', 'cargo test --lib', and 'cargo test --doc'.
+  tags:
+    - rust
+    - testing
+    - quality
+  verified: true
+
+- name: Refactor code to satisfy the borrow checker
+  preconditions:
+    - The compiler reports borrow-check errors
+  procedure:
+    - >
+      Read the error and identify the conflicting borrows.
+    - >
+      Reduce the scope of borrows by introducing nested blocks.
+    - >
+      Clone data if ownership must be transferred.
+    - >
+      Restructure to return owned values instead of references to locals.
+    - >
+      Use 'Rc'/'Arc' for shared ownership and 'RefCell'/'Mutex' for interior mutability.
+    - >
+      Re-run 'cargo check' after each change.
+  tags:
+    - rust
+    - ownership
+    - borrow-checker
+    - refactoring
+  verified: true
+
+- name: Add structured logging with tracing
+  preconditions:
+    - You need observable async or multi-threaded behavior
+  procedure:
+    - >
+      Add 'tracing' and 'tracing-subscriber' to dependencies.
+    - >
+      Initialize a subscriber in 'main' (e.g., 'tracing_subscriber::fmt::init()').
+    - >
+      Instrument functions with '#[instrument]' or manual spans.
+    - >
+      Use structured fields: 'tracing::info!(user_id = %id, "logged in")'.
+    - >
+      Avoid logging secrets or PII.
+  tags:
+    - rust
+    - tracing
+    - observability
+  verified: true
+
+- name: Profile and optimize Rust code
+  preconditions:
+    - The program is too slow or allocates too much
+  procedure:
+    - >
+      Build a release binary with 'cargo build --release'.
+    - >
+      Use 'cargo bench' or Criterion for reproducible measurements.
+    - >
+      Profile with 'perf', 'samply', 'cargo flamegraph', or Xcode Instruments.
+    - >
+      Identify hot loops and reduce allocations (pre-size 'Vec', reuse buffers).
+    - >
+      Re-measure after each optimization.
+  tags:
+    - rust
+    - performance
+    - profiling
+  verified: true
+
+- name: Write safe FFI bindings
+  preconditions:
+    - You need to call C libraries from Rust
+  procedure:
+    - >
+      Declare 'unsafe extern "C"' blocks for C function signatures.
+    - >
+      Use 'std::ffi' types ('c_char', 'c_int', 'CString', 'CStr').
+    - >
+      Wrap raw pointers and unsafe calls in safe Rust APIs that document invariants.
+    - >
+      Use 'bindgen' for large headers.
+    - >
+      Catch panics at FFI boundaries to prevent unwinding into foreign code.
+  tags:
+    - rust
+    - ffi
+    - unsafe
+  verified: true
+
+- name: Create a procedural macro
+  preconditions:
+    - You need compile-time code generation
+  procedure:
+    - >
+      Create a new crate with 'cargo new --lib my_macro' and set 'crate-type = ["proc-macro"]'.
+    - >
+      Add 'proc-macro2', 'quote', and 'syn' as dependencies.
+    - >
+      Implement '#[proc_macro_derive(...)]', '#[proc_macro_attribute]', or '#[proc_macro]'.
+    - >
+      Parse input with 'syn', generate output with 'quote', and return a 'TokenStream'.
+    - >
+      Add UI tests with 'trybuild'.
+  tags:
+    - rust
+    - macros
+    - metaprogramming
+  verified: true
+
+- name: Organize a Cargo workspace
+  preconditions:
+    - The project has multiple related crates
+  procedure:
+    - >
+      Create a root 'Cargo.toml' with '[workspace]' and 'members'.
+    - >
+      Set a shared 'resolver' (e.g., '"3"') and 'workspace.dependencies'.
+    - >
+      Reference workspace deps in members with '{ workspace = true }'.
+    - >
+      Run 'cargo check --workspace' and 'cargo test --workspace'.
+    - >
+      Keep public APIs small and re-export only what consumers need.
+  tags:
+    - rust
+    - cargo
+    - workspace
+    - architecture
+  verified: true
+
+- name: Use feature flags cleanly
+  preconditions:
+    - A crate has optional functionality or dependencies
+  procedure:
+    - >
+      Define features in '[features]' and mark optional deps with 'optional = true'.
+    - >
+      Gate code with '#[cfg(feature = "...")]'.
+    - >
+      Avoid enabling unrelated features by default.
+    - >
+      Test with '--all-features', '--no-default-features', and each feature individually.
+  tags:
+    - rust
+    - cargo
+    - features
+  verified: true
+
+- name: Build an HTTP server with axum
+  preconditions:
+    - You need a web API or microservice
+  procedure:
+    - >
+      Add 'axum', 'tokio', and 'serde'/'serde_json'.
+    - >
+      Create a 'Router' with routes and handler functions.
+    - >
+      Extract path/query/body with extractor types.
+    - >
+      Bind a 'TcpListener' and call 'axum::serve'.
+    - >
+      Add middleware for tracing, auth, or CORS as needed.
+  tags:
+    - rust
+    - axum
+    - http
+    - web
+  verified: true
+
+- name: Perform database queries with sqlx
+  preconditions:
+    - The application needs type-safe SQL queries
+  procedure:
+    - >
+      Add 'sqlx' and a runtime driver (e.g., 'sqlx-postgres').
+    - >
+      Define connection configuration and create a pool.
+    - >
+      Use 'query_as!' or 'query_as::<_, Row>()' with '#[derive(sqlx::FromRow)]'.
+    - >
+      Handle 'sqlx::Error' and use transactions with 'begin().await?'.
+    - >
+      Test against a real or Dockerized database.
+  tags:
+    - rust
+    - sqlx
+    - database
+    - async
+  verified: true
+
+- name: Implement the builder pattern
+  preconditions:
+    - A struct has many optional fields or complex validation
+  procedure:
+    - >
+      Create a separate 'FooBuilder' struct mirroring target fields as 'Option' or defaults.
+    - >
+      Add chainable setter methods consuming and returning 'self'.
+    - >
+      Implement a 'build(self) -> Result<Foo, BuildError>' method.
+    - >
+      Optionally use typestate generics to enforce required fields at compile time.
+  tags:
+    - rust
+    - patterns
+    - api-design
+  verified: true
+
+- name: Use the newtype pattern
+  preconditions:
+    - You need strong typing around primitive values
+  procedure:
+    - >
+      Define a tuple struct wrapping the primitive (e.g., 'struct UserId(u64)').
+    - >
+      Derive 'Debug', 'Clone', 'Copy', 'PartialEq', 'Eq', 'Hash' as appropriate.
+    - >
+      Add constructors and accessor methods.
+    - >
+      Use the newtype in APIs instead of the raw primitive.
+  tags:
+    - rust
+    - newtype
+    - type-safety
+  verified: true
+
+- name: Run Clippy and rustfmt
+  preconditions:
+    - You want consistent, idiomatic, and lint-clean code
+  procedure:
+    - >
+      Format with 'cargo fmt' (configure '.rustfmt.toml' if needed).
+    - >
+      Run 'cargo clippy --all-targets --all-features -- -D warnings'.
+    - >
+      Fix reported lints or add '#[allow(clippy::...)]' with a justification.
+    - >
+      Add formatting and lint checks to CI.
+  tags:
+    - rust
+    - tooling
+    - quality
+  verified: true
+
+- name: Implement async traits
+  preconditions:
+    - A trait needs async methods
+  procedure:
+    - >
+      On Rust 1.75+, write 'async fn' directly in traits.
+    - >
+      For dynamic dispatch, return 'Pin<Box<dyn Future<Output = T> + Send + '_>>'.
+    - >
+      Alternatively use the 'async-trait' crate for broader compatibility.
+    - >
+      Ensure return-position 'impl Trait' (RPITIT) captures the right lifetimes.
+  tags:
+    - rust
+    - async
+    - traits
+  verified: true
+
+- name: Create self-referential types safely
+  preconditions:
+    - A struct must hold references into its own data
+  procedure:
+    - >
+      Prefer storing indices or IDs instead of references.
+    - >
+      If references are required, use 'Pin<Box<Self>>' and 'PhantomPinned'.
+    - >
+      Never provide an API that moves the struct after pinning.
+    - >
+      Document all safety invariants in '// SAFETY:' comments.
+  tags:
+    - rust
+    - unsafe
+    - lifetimes
+  verified: true
+
+- name: Set up a CI pipeline for Rust
+  preconditions:
+    - The project is hosted in GitHub/GitLab/etc.
+  procedure:
+    - >
+      Use 'dtolnay/rust-toolchain' to install stable Rust and components.
+    - >
+      Cache dependencies with 'Swatinem/rust-cache'.
+    - >
+      Run 'cargo check', 'cargo test', 'cargo fmt --check', and 'cargo clippy -- -D warnings'.
+    - >
+      Optionally run 'cargo audit' and 'cargo test --doc'.
+    - >
+      Build release artifacts on tags.
+  tags:
+    - rust
+    - ci
+    - devops
+  verified: true
+
+- name: Cross-compile Rust binaries
+  preconditions:
+    - The target platform differs from the host
+  procedure:
+    - >
+      Install the target with 'rustup target add <target>'.
+    - >
+      Install a cross-compilation linker or use 'cross'/'cargo-cross'.
+    - >
+      Configure '~/.cargo/config.toml' with '[target.<target>].linker'.
+    - >
+      Build with 'cargo build --target <target> --release'.
+    - >
+      Test the produced artifact on the target or in an emulator.
+  tags:
+    - rust
+    - cross-compilation
+    - build
+  verified: true
+
+- name: Generate and publish documentation
+  preconditions:
+    - The crate has public APIs that need docs
+  procedure:
+    - >
+      Write doc comments for every public item.
+    - >
+      Include '# Examples', '# Panics', '# Errors', and '# Safety' sections.
+    - >
+      Run 'cargo doc --no-deps' and 'cargo test --doc'.
+    - >
+      Fix broken intra-doc links ('[Foo]' and '['Bar']').
+    - >
+      Publish to docs.rs by releasing on crates.io.
+  tags:
+    - rust
+    - documentation
+    - rustdoc
+  verified: true
+
+- name: Apply dependency updates safely
+  preconditions:
+    - New versions of dependencies are available
+  procedure:
+    - >
+      Review changelogs and release notes for breaking changes.
+    - >
+      Update 'Cargo.toml' constraints or run 'cargo update -p crate'.
+    - >
+      Run the full test suite.
+    - >
+      Check 'cargo tree' for duplicates and audit with 'cargo audit'.
+    - >
+      Commit 'Cargo.lock' if this is an application.
+  tags:
+    - rust
+    - dependencies
+    - maintenance
+  verified: true
+
+- name: Use channels for thread communication
+  preconditions:
+    - Threads need to exchange messages rather than share memory
+  procedure:
+    - >
+      Create a channel with 'std::sync::mpsc::channel()' (sync) or 'tokio::sync::mpsc::channel(n)' (async).
+    - >
+      Move the sender into the producer thread/task and keep the receiver in the consumer.
+    - >
+      Send values with 'send()' and receive with 'recv()' / '.await'.
+    - >
+      Drop all senders to close the channel cleanly.
+  tags:
+    - rust
+    - concurrency
+    - channels
+  verified: true
+
+- name: Handle optional values idiomatically
+  preconditions:
+    - A value may or may not be present
+  procedure:
+    - >
+      Represent absence with 'Option<T>'.
+    - >
+      Use 'if let Some(x) = opt' or 'let Some(x) = opt else { return; };' for extraction.
+    - >
+      Transform with 'map', 'and_then', 'filter', 'ok_or', and 'unwrap_or_else'.
+    - >
+      Avoid 'unwrap()' unless the invariant is obvious and documented.
+  tags:
+    - rust
+    - option
+    - control-flow
+  verified: true
+
+- name: Validate and sanitize inputs
+  preconditions:
+    - User or external data enters the program
+  procedure:
+    - >
+      Parse into typed newtypes (e.g., 'Email', 'Port') that enforce invariants.
+    - >
+      Use 'TryFrom'/'TryInto' for fallible conversions.
+    - >
+      Check paths with '.starts_with' after canonicalization.
+    - >
+      Limit sizes and recursion depth for deserialized data.
+    - >
+      Never pass untrusted input to 'unwrap' or panic paths.
+  tags:
+    - rust
+    - security
+    - validation
+  verified: true
+
+- name: Debug compiler errors methodically
+  preconditions:
+    - "'cargo check' or 'cargo build' emits errors"
+  procedure:
+    - >
+      Read the first error message fully; later errors often cascade.
+    - >
+      Look at the spans and suggested fixes.
+    - >
+      Simplify the code to isolate the issue.
+    - >
+      Consult 'rustc --explain EXXX' for the error code.
+    - >
+      Search the error text in the Rust Reference or community forums.
+  tags:
+    - rust
+    - debugging
+    - compiler
+  verified: true

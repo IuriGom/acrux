@@ -1,0 +1,638 @@
+- name: Write a RAII wrapper for a C resource
+  preconditions:
+    - You have a raw C-style resource (file handle, socket, memory block, library handle).
+    - You need deterministic cleanup even on exceptions or early returns.
+  procedure:
+    - Create a class whose constructor acquires the resource.
+    - Release the resource in the destructor.
+    - Delete copy operations or implement deep copy semantics as appropriate.
+    - Implement move constructor and move assignment as 'noexcept' if ownership can transfer.
+    - Provide accessor methods that expose the raw handle only when necessary.
+  tags:
+    - cpp
+    - resource-management
+  verified: true
+
+- name: Choose the right standard container
+  preconditions:
+    - You need to store a collection of objects in memory.
+    - You know the access pattern (random, sequential, frequent insert/erase).
+  procedure:
+    - Default to std::vector for a growable sequence.
+    - Use std::array when the size is fixed at compile time.
+    - Use std::deque for frequent front/back operations with random access.
+    - Use std::list or std::forward_list for stable iterators and frequent middle insert/erase.
+    - Use std::map/std::set for ordered keys; std::unordered_map/std::unordered_set for average O(1) lookup.
+    - Use std::flat_map/std::flat_set (C++23) when cache locality matters more than insertion speed.
+    - Use std::span or std::string_view for non-owning views.
+  tags:
+    - cpp
+    - containers
+  verified: true
+
+- name: Implement value semantics with Rule of Zero/Five
+  preconditions:
+    - A class owns a resource or has members that do.
+    - You need copy/move/destruction to behave correctly.
+  procedure:
+    - If the class owns no raw resource, rely on Rule of Zero and let the compiler generate members.
+    - If you define a custom destructor, copy constructor, copy assignment, move constructor, or move assignment, define or delete all five.
+    - Prefer wrapping the resource in a std::unique_ptr or RAII helper to fall back to Rule of Zero.
+    - Make move operations noexcept.
+    - Provide a non-member swap if exception-safe assignment is needed.
+  tags:
+    - cpp
+    - value-semantics
+  verified: true
+
+- name: Use std::optional for nullable values
+  preconditions:
+    - A function may or may not return a value.
+    - You want to avoid sentinel values or out-parameters.
+  procedure:
+    - Return std::optional<T> from the function.
+    - Return std::nullopt to signal absence.
+    - Check the optional with if (opt) or opt.has_value() before accessing.
+    - Use value_or(default) to provide a fallback.
+    - For C++23, chain monadic operations with transform, and_then, or_else.
+  tags:
+    - cpp
+    - error-handling
+  verified: true
+
+- name: Use concepts to constrain a template
+  preconditions:
+    - You are writing a function or class template.
+    - You want clearer error messages and safer overloads than SFINAE.
+  procedure:
+    - Include <concepts>.
+    - Define a named concept or use a standard concept (std::integral, std::ranges::range, etc.).
+    - Apply the concept in the template parameter list or requires clause.
+    - Test that invalid types produce a clean compile error at the call site.
+  tags:
+    - cpp
+    - templates
+    - c++20
+  verified: true
+
+- name: Debug undefined behavior with sanitizers
+  preconditions:
+    - The program crashes, produces wrong results, or behaves differently at different optimization levels.
+    - You suspect memory corruption, uninitialized reads, or undefined behavior.
+  procedure:
+    - Build with -fsanitize=address,undefined (GCC/Clang).
+    - Run the failing test or scenario.
+    - Read the sanitizer report to locate the faulting instruction and stack trace.
+    - Fix the root cause (bounds, initialization, lifetime, strict aliasing).
+    - Re-run under the sanitizer until clean.
+  tags:
+    - cpp
+    - debugging
+  verified: true
+
+- name: Write a thread-safe lazy singleton
+  preconditions:
+    - You genuinely need one global instance.
+    - Initialization must be thread-safe and lazy.
+  procedure:
+    - Provide a static instance() function returning a reference.
+    - Use a function-local static object (Meyers' singleton) for C++11 and later.
+    - Delete copy constructor and copy assignment.
+    - Avoid global non-const variables; prefer injection for testability.
+    - If complex construction order matters, redesign to avoid the singleton.
+  tags:
+    - cpp
+    - concurrency
+  verified: true
+
+- name: Apply the copy-and-swap idiom
+  preconditions:
+    - A class manages a resource and needs exception-safe assignment.
+    - You have or can write a non-throwing swap function.
+  procedure:
+    - Implement copy constructor and destructor as usual.
+    - Implement a non-member friend swap or member swap that is noexcept.
+    - Implement operator= taking the type by value (copy or move is made by the caller).
+    - Swap *this with the by-value parameter.
+    - The by-value parameter's destructor cleans up the old state.
+  tags:
+    - cpp
+    - value-semantics
+  verified: true
+
+- name: Use a range pipeline instead of raw loops
+  preconditions:
+    - You are transforming, filtering, or aggregating a sequence.
+    - The operation can be expressed declaratively.
+  procedure:
+    - Include <ranges> (C++20).
+    - Create views with std::views::filter, transform, take, drop, iota, etc.
+    - Pipe views together.
+    - Materialize into a container with ranges::to (C++23) or an explicit loop if needed.
+    - "Prefer std:: algorithms when a single algorithm (sort, find, accumulate) is enough."
+  tags:
+    - cpp
+    - ranges
+    - c++20
+  verified: true
+
+- name: Avoid dangling references from std::string_view
+  preconditions:
+    - You are considering std::string_view as a parameter or return type.
+    - The viewed string's lifetime must outlast the view.
+  procedure:
+    - Use std::string_view for read-only function parameters when the caller owns the string.
+    - Do not store a string_view to a temporary std::string.
+    - Do not return a string_view to a local std::string.
+    - Use std::string for ownership and std::string_view for borrowing.
+  tags:
+    - cpp
+    - lifetime
+  verified: true
+
+- name: Write exception-safe code with RAII
+  preconditions:
+    - A function allocates resources or locks mutexes.
+    - Exceptions may propagate before the function returns normally.
+  procedure:
+    - Acquire each resource in a constructor and release in a destructor.
+    - Use std::unique_ptr, std::lock_guard, std::ifstream, etc.
+    - Keep try blocks small; let destructors do cleanup.
+    - Provide at least basic exception guarantee; aim for strong guarantee for transactional operations.
+    - Document noexcept on move, swap, and trivial accessors.
+  tags:
+    - cpp
+    - exceptions
+  verified: true
+
+- name: Implement move semantics correctly
+  preconditions:
+    - A class owns a resource that can be transferred cheaply.
+    - You want to avoid expensive copies.
+  procedure:
+    - Define a move constructor that steals the resource and leaves the source in a valid empty state.
+    - Define a move assignment that self-checks, frees old resource, steals, and nullifies the source.
+    - Mark both noexcept.
+    - Use std::move on rvalues and std::forward for forwarding references.
+    - Do not std::move local variables that you plan to return by value.
+  tags:
+    - cpp
+    - performance
+  verified: true
+
+- name: Use std::expected for error codes without exceptions
+  preconditions:
+    - You cannot or prefer not to use exceptions.
+    - A function can fail in a well-defined way.
+    - You are on C++23 or have a backport.
+  procedure:
+    - Return std::expected<T, E>.
+    - Return std::unexpected(error) on failure.
+    - Check with if (result) or result.has_value().
+    - Propagate errors early with early return or monadic and_then/or_else.
+    - Keep E small, copyable, and descriptive.
+  tags:
+    - cpp
+    - error-handling
+    - c++23
+  verified: true
+
+- name: Apply PImpl to reduce compile dependencies
+  preconditions:
+    - A class header pulls in many implementation-only headers.
+    - You need stable ABI or faster builds.
+  procedure:
+    - Forward-declare a private implementation struct in the public header.
+    - Store it via std::unique_ptr<Impl> as the only private data member.
+    - Declare (but do not define) destructor, move constructor, and move assignment in the header.
+    - Define them in the .cpp file where Impl is complete.
+    - Add copy operations only if needed, also defined out-of-line.
+  tags:
+    - cpp
+    - design
+  verified: true
+
+- name: Fix iterator invalidation bugs
+  preconditions:
+    - You are inserting or erasing from a container while iterating.
+    - Iterators, pointers, or references may become invalid.
+  procedure:
+    - Consult the container's invalidation rules before modifying.
+    - When erasing in a loop, use the iterator returned by erase.
+    - Reserve capacity in std::vector before a known number of insertions.
+    - Avoid holding references across insertions/rehashes.
+    - Use node-based containers (list, map, set) when stable iterators are required.
+  tags:
+    - cpp
+    - containers
+  verified: true
+
+- name: Write a generic lambda for small algorithms
+  preconditions:
+    - You need a small local function object.
+    - The operation is used once or twice near its definition.
+  procedure:
+    - Use auto parameters for generic lambdas (C++14).
+    - Capture by value [=] when the lambda outlives its scope; capture by reference [&] only when lifetime is guaranteed.
+    - Avoid default capturing this; be explicit with [this] or [*this].
+    - Keep lambdas short; extract named functions if logic grows.
+  tags:
+    - cpp
+    - lambdas
+  verified: true
+
+- name: Replace raw new/delete with smart pointers
+  preconditions:
+    - You see a naked new or delete.
+    - Ownership semantics are unclear or exception-unsafe.
+  procedure:
+    - Use std::make_unique<T>(args) for exclusive ownership.
+    - Use std::make_shared<T>(args) for shared ownership.
+    - Use std::weak_ptr to break cycles.
+    - If a C API returns a raw pointer, use a custom deleter with std::unique_ptr.
+    - Never call delete on a pointer managed by a smart pointer.
+  tags:
+    - cpp
+    - memory
+  verified: true
+
+- name: Write a unit test for a C++ class
+  preconditions:
+    - You have implemented a class or free function.
+    - You want automated verification of behavior.
+  procedure:
+    - Pick a test framework (Catch2, GoogleTest, doctest).
+    - Write independent test cases for normal, edge, and error inputs.
+    - Use RAII and scopes to test lifetimes and exception safety.
+    - Compile and run tests in CI with sanitizers enabled.
+    - Keep tests fast and deterministic.
+  tags:
+    - cpp
+    - testing
+  verified: true
+
+- name: Profile and optimize a hot loop
+  preconditions:
+    - A program is too slow and profiling points to a specific loop.
+    - You have measured before optimizing.
+  procedure:
+    - Profile with perf, Instruments, or a sampling profiler.
+    - Check for cache misses, branch mispredictions, and allocations inside the loop.
+    - Move invariant computation out of the loop.
+    - Use contiguous data and algorithms that traverse memory linearly.
+    - Consider parallel execution policies (std::execution::par) for large independent workloads.
+    - Re-profile after changes.
+  tags:
+    - cpp
+    - performance
+  verified: true
+
+- name: Migrate from C headers to C++ headers
+  preconditions:
+    - Code uses <*.h> C compatibility headers.
+    - You want standard C++ names and safety.
+  procedure:
+    - Replace <stdio.h> with <cstdio>, <stdlib.h> with <cstdlib>, etc.
+    - "Use std:: prefix for C library functions or qualify carefully."
+    - Prefer std::string and std::vector over raw arrays.
+    - Replace printf/scanf with std::format/print or streams.
+    - Avoid C-style casts; use named casts.
+  tags:
+    - cpp
+    - modernization
+  verified: true
+
+- name: Write a coroutine generator
+  preconditions:
+    - You need to lazily produce a sequence of values.
+    - You are on C++23 or have a generator type available.
+  procedure:
+    - Define a function returning std::generator<T>.
+    - Use co_yield to produce each value.
+    - Keep coroutine frame lifetime in mind; avoid references to local variables across suspension points.
+    - Iterate with a range-for.
+    - For custom coroutine types, implement a promise type with get_return_object, yield_value, and return_void.
+  tags:
+    - cpp
+    - coroutines
+    - c++23
+  verified: true
+
+- name: Use std::format safely
+  preconditions:
+    - You are formatting strings in C++20/23.
+    - You want type-safe formatting without buffer overflows.
+  procedure:
+    - Use std::format for delayed formatting into std::string.
+    - Use std::print/std::println (C++23) for direct output.
+    - Match format specifiers to argument types; mismatches are compile-time errors for std::format.
+    - Do not pass user-controlled strings as the format string; pass them as arguments.
+    - Implement std::formatter<T> for custom types.
+  tags:
+    - cpp
+    - strings
+    - c++20
+  verified: true
+
+- name: Build with CMake
+  preconditions:
+    - You are starting or maintaining a C++ project.
+    - You need portable builds across platforms/compilers.
+  procedure:
+    - Write a top-level CMakeLists.txt with project, standards, and targets.
+    - Use target_compile_options and target_link_libraries per target.
+    - Separate configure and build steps with cmake -S . -B build.
+    - Use find_package for dependencies and add them to target_link_libraries.
+    - Add tests with CTest and enable_testing().
+  tags:
+    - cpp
+    - build-systems
+  verified: true
+
+- name: Handle concurrency with jthread
+  preconditions:
+    - You need a worker thread.
+    - You want automatic joining and stop-token support.
+  procedure:
+    - Use std::jthread (C++20) instead of std::thread.
+    - Pass a callable that accepts std::stop_token if cancellation is needed.
+    - Periodically check stop_token.stop_requested() in long-running loops.
+    - Request cancellation with j.request_stop().
+    - Avoid detach; prefer join or jthread RAII.
+  tags:
+    - cpp
+    - concurrency
+    - c++20
+  verified: true
+
+- name: Write a type-safe enum
+  preconditions:
+    - You are defining a set of named constants.
+    - You want to avoid name leakage and implicit integer conversions.
+  procedure:
+    - Use enum class.
+    - Specify the underlying type if size matters.
+    - Use std::to_underlying (C++23) when you need the integer value.
+    - Provide operator|/operator& for bitmask enums if needed.
+    - Switch over enum values with a default case to catch unhandled enumerators.
+  tags:
+    - cpp
+    - enums
+  verified: true
+
+- name: Serialize data with std::bit_cast
+  preconditions:
+    - You need to reinterpret an object's bytes as another type.
+    - You want a type-safe alternative to reinterpret_cast or memcpy.
+  procedure:
+    - Include <bit> (C++20).
+    - Ensure source and destination types have the same size.
+    - Use std::bit_cast<Dest>(source).
+    - Do not use it for pointer reinterpretation across unrelated types (still strict aliasing).
+    - Prefer serialization libraries for complex formats.
+  tags:
+    - cpp
+    - low-level
+    - c++20
+  verified: true
+
+- name: Validate preconditions early
+  preconditions:
+    - A function has assumptions about its inputs.
+    - Violating assumptions leads to UB or hard-to-debug failures.
+  procedure:
+    - Document preconditions in the function signature or comments.
+    - Use if statements with exceptions for recoverable contract violations.
+    - Use assert for internal invariants in debug builds.
+    - Use GSL Expects/Ensures or contracts (if available in your standard/library).
+    - Prefer compile-time checks (static_assert, concepts) when possible.
+  tags:
+    - cpp
+    - design
+  verified: true
+
+- name: Use std::filesystem for path manipulation
+  preconditions:
+    - You need to create, copy, iterate, or inspect files/directories.
+    - You are on C++17 or later.
+  procedure:
+    - Include <filesystem> and use namespace std::filesystem or an alias fs.
+    - Compose paths with operator/.
+    - Check existence with fs::exists and type with fs::is_regular_file.
+    - Iterate with directory_iterator or recursive_directory_iterator.
+    - Handle errors via ec parameter or exceptions.
+  tags:
+    - cpp
+    - filesystem
+  verified: true
+
+- name: Manage dynamic arrays safely
+  preconditions:
+    - You need a runtime-sized array.
+    - Raw new[]/delete[] is tempting.
+  procedure:
+    - Use std::vector<T> for growable arrays.
+    - Use std::unique_ptr<T[]> for fixed-size ownership without vector overhead.
+    - Avoid std::shared_ptr<T[]> unless shared ownership is truly needed (use custom deleter).
+    - Pass views as std::span<T> to non-owning consumers.
+    - Do not pass raw pointers plus size when span is available.
+  tags:
+    - cpp
+    - memory
+  verified: true
+
+- name: Write a constrained algorithm with concepts
+  preconditions:
+    - You want an algorithm that works on a family of types.
+    - You need clean error messages.
+  procedure:
+    - Identify the minimum requirements (iterable, comparable, arithmetic, etc.).
+    - Express them as a standard concept or custom concept.
+    - Write the template with the concept in the parameter list.
+    - Test with valid and invalid types.
+    - Document complexity and preconditions.
+  tags:
+    - cpp
+    - templates
+    - c++20
+  verified: true
+
+- name: Avoid common iterator off-by-one errors
+  preconditions:
+    - You are writing loops over containers or arrays.
+  procedure:
+    - Prefer range-for when index is not needed.
+    - Use std::size or std::ssize for bounds.
+    - Remember algorithms use half-open ranges [first, last).
+    - When using indices, loop for (std::size_t i = 0; i < v.size(); ++i).
+    - For reverse unsigned loops, use std::ssize or signed index type.
+  tags:
+    - cpp
+    - algorithms
+  verified: true
+
+- name: Use std::visit with std::variant
+  preconditions:
+    - You have a std::variant representing a fixed set of alternative types.
+    - You need behavior that depends on the active alternative.
+  procedure:
+    - Define a visitor callable (lambda overload set or struct).
+    - Call std::visit(visitor, variant).
+    - Handle every alternative; the compiler checks exhaustiveness for variants of known types.
+    - Use if constexpr inside a generic lambda to branch on type.
+    - Avoid std::get without checking index/type unless you have already verified it.
+  tags:
+    - cpp
+    - variant
+  verified: true
+
+- name: Prevent slicing in polymorphic hierarchies
+  preconditions:
+    - You have a base class with virtual functions and derived classes with extra state.
+    - You pass objects by value.
+  procedure:
+    - Delete public copy/move constructors in the base if slicing is never desired.
+    - Pass by reference or pointer to base.
+    - Use std::unique_ptr<Base> or std::shared_ptr<Base> for ownership.
+    - Provide a virtual clone() method when value copies of derived objects are needed.
+    - Mark base destructor virtual.
+  tags:
+    - cpp
+    - oop
+  verified: true
+
+- name: Use std::chrono for time calculations
+  preconditions:
+    - You are measuring durations, timeouts, or timestamps.
+    - You want type-safe, monotonic clocks.
+  procedure:
+    - Include <chrono>.
+    - Use std::chrono::steady_clock for intervals.
+    - Use std::chrono::system_clock for wall-clock time.
+    - Perform arithmetic with duration types, not raw integers.
+    - Cast with duration_cast or floor/ceil/round when needed.
+  tags:
+    - cpp
+    - time
+  verified: true
+
+- name: Create a small custom view
+  preconditions:
+    - You need a reusable lazy transformation of a range.
+    - You are comfortable with iterator concepts.
+  procedure:
+    - Define a view class satisfying std::ranges::view.
+    - Provide begin()/end() iterators that model the required iterator concept.
+    - Keep the view cheap to copy (views are non-owning).
+    - Pipe into other views.
+    - Use ranges::range_adaptor_closure (C++23) for closure syntax.
+  tags:
+    - cpp
+    - ranges
+    - advanced
+  verified: true
+
+- name: Reduce template bloat with extern templates
+  preconditions:
+    - A class template is instantiated with the same arguments in many translation units.
+    - Compile times or object sizes are large.
+  procedure:
+    - Explicitly instantiate the template in one .cpp file with template class Foo<int>.
+    - "Declare extern template in the header: extern template class Foo<int>."
+    - Do this only for commonly used instantiations.
+    - Measure compile/link size improvements.
+  tags:
+    - cpp
+    - templates
+  verified: true
+
+- name: Use std::source_location for diagnostics
+  preconditions:
+    - You want to capture file, line, and function information at a call site.
+    - You are on C++20 or later.
+  procedure:
+    - Include <source_location>.
+    - Add std::source_location loc = std::source_location::current() as a default argument.
+    - Store or log loc.file_name(), loc.line(), loc.function_name().
+    - Combine with logging macros or wrapper functions.
+  tags:
+    - cpp
+    - diagnostics
+    - c++20
+  verified: true
+
+- name: Keep functions small and focused
+  preconditions:
+    - A function is growing beyond one screen.
+    - Multiple responsibilities are appearing.
+  procedure:
+    - Extract each responsibility into a named helper function.
+    - Limit the number of parameters; use structs for related options.
+    - Return early to reduce nesting.
+    - Name functions after what they do, not how.
+    - Apply the single-responsibility principle.
+  tags:
+    - cpp
+    - clean-code
+  verified: true
+
+- name: Document API with Doxygen-style comments
+  preconditions:
+    - You are writing a public header or library interface.
+    - Future maintainers and users need reference documentation.
+  procedure:
+    - Use /** */ blocks above classes, functions, and members.
+    - Tag parameters with @param and return values with @return.
+    - Note preconditions, postconditions, exceptions, and thread safety.
+    - Keep comments synchronized with code changes.
+    - Generate docs with Doxygen or Sphinx+Breathe if needed.
+  tags:
+    - cpp
+    - documentation
+  verified: true
+
+- name: Use a static analyzer in CI
+  preconditions:
+    - You have a C++ project under version control.
+    - You want to catch bugs and style issues automatically.
+  procedure:
+    - Enable compiler warnings (-Wall -Wextra -Wpedantic -Werror).
+    - Run clang-tidy with a sensible set of checks (cppcoreguidelines-*, bugprone-*, performance-*, modernize-*).
+    - Run cppcheck as a secondary tool.
+    - Fail CI on new warnings.
+    - Suppress false positives with NOLINT comments and justification.
+  tags:
+    - cpp
+    - tools
+    - ci
+  verified: true
+
+- name: Refactor a raw loop to an algorithm
+  preconditions:
+    - A loop implements a common operation (find, count, transform, accumulate).
+    - Readability and correctness would improve with a named algorithm.
+  procedure:
+    - Identify the intent of the loop.
+    - Choose the matching standard algorithm.
+    - Replace the loop body with a lambda or function object.
+    - Verify iterator invalidation and complexity.
+    - Add tests covering the original behavior.
+  tags:
+    - cpp
+    - refactoring
+  verified: true
+
+- name: Write a noexcept move for containers
+  preconditions:
+    - A class is frequently stored in std::vector or similar container.
+    - Reallocation performance matters.
+  procedure:
+    - Define a move constructor that does not allocate or throw.
+    - Mark it noexcept.
+    - Define a matching move assignment, also noexcept.
+    - Ensure the moved-from object is destructible and assignable.
+    - Benchmark vector growth to confirm moves are used during reallocation.
+  tags:
+    - cpp
+    - performance
+  verified: true

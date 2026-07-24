@@ -1,0 +1,134 @@
+- name: write_clean_function
+  preconditions:
+    - Writing a new function or method
+  procedure:
+    - Give it a descriptive name that reveals intent
+    - Keep it small and focused on one task
+    - Limit number of parameters; use objects or tuples if needed
+    - Avoid side effects when possible
+    - Return values rather than mutating globals
+  tags:
+    - general-coding
+    - clean-code
+  verified: true
+
+- name: refactor_long_function
+  preconditions:
+    - Function exceeds 30-40 lines or does multiple things
+  procedure:
+    - Identify cohesive sections
+    - Extract each section into a named helper function
+    - Replace inline comments with function names
+    - Verify behavior with tests before and after
+  tags:
+    - general-coding
+    - refactoring
+  verified: true
+
+- name: name_variables_well
+  preconditions:
+    - Choosing identifiers for variables, functions, or classes
+  procedure:
+    - Use intention-revealing names
+    - Avoid abbreviations and single-letter names except in short loops
+    - Use consistent naming conventions for the language
+    - Make names pronounceable and searchable
+  tags:
+    - general-coding
+    - naming
+  verified: true
+
+- name: write_unit_test
+  preconditions:
+    - Adding or modifying code
+  procedure:
+    - Test one behavior per test case
+    - Use Arrange-Act-Assert structure
+    - Name tests descriptively
+    - Include edge cases and error paths
+    - Keep tests independent and repeatable
+  tags:
+    - general-coding
+    - testing
+  verified: true
+
+- name: review_code
+  preconditions:
+    - Reviewing a pull request or teammate's code
+  procedure:
+    - Check correctness and edge cases first
+    - Look for security and performance issues
+    - Verify tests exist and pass
+    - Comment on maintainability and readability
+    - Approve or request changes clearly
+  tags:
+    - general-coding
+    - code-review
+  verified: true
+
+- name: choose_abstraction
+  preconditions:
+    - Designing a module or class hierarchy
+  procedure:
+    - Prefer composition over inheritance
+    - Hide internal details behind stable interfaces
+    - Avoid premature abstraction
+    - Ensure abstractions reduce complexity, not increase it
+  tags:
+    - general-coding
+    - design
+  verified: true
+
+- name: handle_errors_gracefully
+  preconditions:
+    - Code may fail at runtime
+  procedure:
+    - Fail fast and validate inputs
+    - Use exceptions for exceptional cases, not control flow
+    - Provide meaningful error messages
+    - Log enough context for debugging
+    - Recover when possible, crash safely when not
+  tags:
+    - general-coding
+    - error-handling
+  verified: true
+
+- name: document_public_api
+  preconditions:
+    - Exposing a public function, class, or module
+  procedure:
+    - Explain what it does, not just how
+    - Document parameters, return values, and exceptions
+    - Include usage examples for non-trivial cases
+    - Keep docs close to code so they stay in sync
+  tags:
+    - general-coding
+    - documentation
+  verified: true
+
+- name: reduce_complexity
+  preconditions:
+    - Code is hard to understand or modify
+  procedure:
+    - Remove duplicated logic via helpers or loops
+    - Simplify conditionals with early returns
+    - Replace magic numbers with named constants
+    - Break nested structures into smaller functions
+  tags:
+    - general-coding
+    - refactoring
+  verified: true
+
+- name: optimize_performance
+  preconditions:
+    - Code is too slow and profiling shows a bottleneck
+  procedure:
+    - Measure before optimizing
+    - Focus on hot paths and big-O complexity
+    - Cache repeated computations
+    - Reduce allocations and I/O
+    - Re-measure after each change
+  tags:
+    - general-coding
+    - performance
+  verified: true

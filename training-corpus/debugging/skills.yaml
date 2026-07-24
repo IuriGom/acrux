@@ -1,0 +1,652 @@
+- name: Reproduce a reported bug
+  preconditions:
+    - A bug report with symptoms and environment is available.
+    - Source code and test environment are accessible.
+  procedure:
+    - Read the bug report and extract the observed failure, expected behavior, and environment.
+    - Collect inputs, configuration, dependency versions, and any relevant data.
+    - Create a standalone script or test that exercises the reported scenario.
+    - Run the script repeatedly and remove sources of nondeterminism.
+    - Verify the failure occurs on demand before starting root-cause analysis.
+  tags:
+    - debugging
+  verified: true
+
+- name: Minimize a failing reproduction
+  preconditions:
+    - A reproduction exists but is large or slow.
+  procedure:
+    - Identify components that can be removed while preserving the failure.
+    - Remove one component at a time and rerun the reproduction.
+    - Keep removals that still trigger the failure; restore those that do not.
+    - Repeat until no further component can be removed.
+    - Save the minimal reproducer as a regression test.
+  tags:
+    - debugging
+  verified: true
+
+- name: Bisect a regression with git
+  preconditions:
+    - A known good commit or tag exists.
+    - HEAD or a recent commit is bad.
+    - A reproduction script can be run automatically.
+  procedure:
+    - Run git bisect start.
+    - Mark the current bad commit with git bisect bad.
+    - Mark the known good commit with git bisect good <commit>.
+    - At each checkout, run the reproduction script.
+    - Mark each midpoint good or bad based on the script result.
+    - Inspect the first bad commit once bisect finishes.
+    - Run git bisect reset to return to the original branch.
+  tags:
+    - debugging
+    - git
+  verified: true
+
+- name: Debug a Python script with pdb
+  preconditions:
+    - A Python script exhibits incorrect behavior or crashes.
+  procedure:
+    - Insert breakpoint() at the location where you want to inspect state.
+    - Run the script normally; execution pauses at the breakpoint.
+    - Use n to step over, s to step into, and c to continue.
+    - Inspect variables with p and the stack with w/u/d.
+    - Use l to list source and pp for pretty printing.
+    - Modify variables or call functions to test hypotheses.
+    - Quit with q when done.
+  tags:
+    - debugging
+    - python
+  verified: true
+
+- name: Perform post-mortem debugging in Python
+  preconditions:
+    - An unhandled Python exception has occurred in an interactive session.
+  procedure:
+    - Import pdb.
+    - Call pdb.pm() to enter the debugger at the exception frame.
+    - Inspect variables and traceback to identify the cause.
+    - Test fixes in a fresh interpreter or script.
+  tags:
+    - debugging
+    - python
+  verified: true
+
+- name: Find a Python memory leak
+  preconditions:
+    - A Python process grows in memory over time.
+  procedure:
+    - Enable tracemalloc and take a baseline snapshot.
+    - Run the suspected workload.
+    - Take a second snapshot and compare_to the baseline.
+    - Inspect the top growth sites for unexpected allocations.
+    - Use objgraph and gc to find reference cycles.
+    - Fix the leak and verify with a repeat measurement.
+  tags:
+    - debugging
+    - python
+    - memory
+  verified: true
+
+- name: Debug an asyncio issue
+  preconditions:
+    - Async Python code hangs, loses tasks, or reports unawaited coroutines.
+  procedure:
+    - Enable asyncio debug mode with asyncio.run(main(), debug=True).
+    - Watch for warnings about coroutines never awaited or slow callbacks.
+    - Ensure every create_task result is awaited or stored.
+    - Move blocking calls to run_in_executor or a thread pool.
+    - Use asyncio.all_tasks() to inspect running work.
+  tags:
+    - debugging
+    - python
+    - concurrency
+  verified: true
+
+- name: Debug a JavaScript application in Chrome DevTools
+  preconditions:
+    - A browser-based or Node.js application is misbehaving.
+  procedure:
+    - Open DevTools and look at the Console for errors.
+    - Use the Sources panel to set breakpoints or add debugger; statements.
+    - Inspect variables, call stack, and DOM/network state.
+    - Use the Network panel to verify requests and responses.
+    - Use the Performance panel for CPU or layout issues.
+  tags:
+    - debugging
+    - javascript
+  verified: true
+
+- name: Debug a Node.js process with the inspector
+  preconditions:
+    - A Node.js script crashes or behaves incorrectly.
+  procedure:
+    - Start the process with node --inspect or node --inspect-brk.
+    - Open chrome://inspect or attach VS Code.
+    - Set breakpoints and inspect variables.
+    - Use heap and CPU profilers if performance is involved.
+    - Handle unhandledRejection and uncaughtException events.
+  tags:
+    - debugging
+    - javascript
+    - nodejs
+  verified: true
+
+- name: Debug a C/C++ program with GDB
+  preconditions:
+    - A C/C++ program crashes or produces wrong output.
+    - The program is compiled with -g.
+  procedure:
+    - Launch gdb ./program.
+    - Set breakpoints with break.
+    - Run the program with run [args].
+    - Step with n/s and continue with c.
+    - Inspect state with print, info locals, and backtrace.
+    - For crashes, load the core dump with core-file.
+  tags:
+    - debugging
+    - c
+    - cpp
+  verified: true
+
+- name: Use AddressSanitizer to find memory errors
+  preconditions:
+    - A C/C++ program has suspected memory corruption, UAF, or overflow.
+  procedure:
+    - Recompile with -fsanitize=address -g -O1 -fno-omit-frame-pointer.
+    - Run the program and reproduce the failure.
+    - Read the ASan report for the error type, address, and stack trace.
+    - Use track-origins or additional flags if needed.
+    - Fix the root cause and rerun under ASan.
+  tags:
+    - debugging
+    - c
+    - cpp
+    - memory
+  verified: true
+
+- name: Use Valgrind Memcheck to find leaks
+  preconditions:
+    - A C/C++ program has suspected memory leaks or invalid accesses.
+  procedure:
+    - Run valgrind --leak-check=full --show-leak-kinds=definite,possible ./program.
+    - Inspect leak summaries and invalid access reports.
+    - Use --track-origins=yes for uninitialized value origins.
+    - Create suppression files only for known external issues.
+    - Fix leaks and invalid accesses, then rerun.
+  tags:
+    - debugging
+    - c
+    - cpp
+    - memory
+  verified: true
+
+- name: Debug a Go program with Delve
+  preconditions:
+    - A Go program crashes, deadlocks, or behaves incorrectly.
+  procedure:
+    - Start with dlv debug or dlv test.
+    - Set breakpoints with break.
+    - Run with continue and step with n/s.
+    - Inspect goroutines with goroutines and switch with goroutine.
+    - Print variables and stack traces.
+    - Use tracepoints or watchpoints for non-stopping observation.
+  tags:
+    - debugging
+    - go
+  verified: true
+
+- name: Detect data races in Go
+  preconditions:
+    - A Go program has flaky or concurrency-related failures.
+  procedure:
+    - Build and run with go run -race or go test -race.
+    - Reproduce the failure under the race detector.
+    - Read the race report for the conflicting accesses and stack traces.
+    - Protect shared state with mutexes, channels, or atomics.
+    - Rerun until no races are reported.
+  tags:
+    - debugging
+    - go
+    - concurrency
+  verified: true
+
+- name: Debug a Rust panic
+  preconditions:
+    - A Rust program panics.
+  procedure:
+    - Run with RUST_BACKTRACE=1 to get a backtrace.
+    - Use RUST_BACKTRACE=full for all threads.
+    - Locate the panic source in the traceback.
+    - Add error handling or fix the underlying invariant.
+    - Add a regression test.
+  tags:
+    - debugging
+    - rust
+  verified: true
+
+- name: Debug a deadlock
+  preconditions:
+    - A program hangs and threads/goroutines are suspected.
+  procedure:
+    - Dump stack traces for all threads.
+    - In Python use faulthandler; in Go send SIGABRT; in Java use jstack.
+    - Identify cycles of locks or waiting goroutines.
+    - Ensure consistent lock ordering and short critical sections.
+    - Add timeouts to lock acquisition where appropriate.
+  tags:
+    - debugging
+    - concurrency
+  verified: true
+
+- name: Debug a flaky test
+  preconditions:
+    - A test passes and fails non-deterministically.
+  procedure:
+    - Run the test many times to estimate the failure rate.
+    - Fix random seeds, time, and ordering.
+    - Run the test in isolation and then in the full suite.
+    - Check for shared mutable state, timing, and external dependencies.
+    - Add logging or assertions for intermediate state.
+  tags:
+    - debugging
+    - testing
+  verified: true
+
+- name: Use structured logging for distributed debugging
+  preconditions:
+    - A request flows through multiple services and failures are hard to trace.
+  procedure:
+    - Generate or accept a correlation/request ID at the entry point.
+    - Propagate the ID in headers and log context.
+    - Emit structured JSON logs with consistent field names.
+    - Query logs by request ID across services.
+    - Add span IDs if using distributed tracing.
+  tags:
+    - debugging
+    - distributed-systems
+  verified: true
+
+- name: Investigate a performance regression
+  preconditions:
+    - Latency or throughput degraded after a change.
+  procedure:
+    - Measure baseline performance on a known good commit.
+    - Profile the current code under the same workload.
+    - Compare flame graphs or call graphs.
+    - Identify the hot path and quantify the change.
+    - Make the smallest change that addresses the bottleneck.
+    - Re-measure and compare.
+  tags:
+    - debugging
+    - performance
+  verified: true
+
+- name: Debug a container that exits unexpectedly
+  preconditions:
+    - A Docker container exits or crashes.
+  procedure:
+    - Run docker logs and docker inspect to get exit code and events.
+    - Check for OOM kills and resource limits.
+    - Run the container interactively with overridden entrypoint.
+    - Capture a core dump if the process crashes.
+    - Fix the underlying error and rebuild.
+  tags:
+    - debugging
+    - docker
+  verified: true
+
+- name: Debug a Kubernetes pod failure
+  preconditions:
+    - A pod is crashing, restarting, or failing probes.
+  procedure:
+    - Run kubectl describe pod for events.
+    - Run kubectl logs --previous for the prior container logs.
+    - Check resource requests and limits.
+    - Verify ConfigMaps, Secrets, and environment variables.
+    - Use kubectl debug for an ephemeral debug container.
+  tags:
+    - debugging
+    - kubernetes
+  verified: true
+
+- name: Trace a network timeout
+  preconditions:
+    - A request times out or hangs.
+  procedure:
+    - Reproduce with curl -v --max-time.
+    - Measure DNS resolution, TCP connect, TLS handshake, and server time.
+    - Check proxy, firewall, and load balancer settings.
+    - Inspect server logs and metrics for the request.
+    - Add or adjust timeouts based on findings.
+  tags:
+    - debugging
+    - networking
+  verified: true
+
+- name: Validate and fix SQL query performance
+  preconditions:
+    - A database query is slow or returns wrong results.
+  procedure:
+    - Capture the exact query from logs or ORM.
+    - Run EXPLAIN ANALYZE on the query.
+    - Check for sequential scans, missing indexes, and large offsets.
+    - Look for N+1 query patterns in application code.
+    - Add indexes or rewrite the query and verify improvement.
+  tags:
+    - debugging
+    - database
+  verified: true
+
+- name: Debug a CI/CD failure
+  preconditions:
+    - Tests or builds pass locally but fail in CI.
+  procedure:
+    - Compare language, runtime, and dependency versions.
+    - Compare environment variables and secrets.
+    - Check for stale caches or artifacts.
+    - Reproduce locally using the same container image.
+    - Add verbose logging and collect artifacts.
+  tags:
+    - debugging
+    - ci-cd
+  verified: true
+
+- name: Write a regression test for a bug
+  preconditions:
+    - The bug has been reproduced.
+  procedure:
+    - Write a test that fails on the current code.
+    - Verify the test fails before the fix.
+    - Apply the fix.
+    - Verify the test passes.
+    - Add the test to the permanent suite.
+  tags:
+    - debugging
+    - testing
+  verified: true
+
+- name: Conduct a post-mortem
+  preconditions:
+    - A significant incident or tricky bug has been resolved.
+  procedure:
+    - Summarize impact, duration, and detection.
+    - Create a timeline of events.
+    - Identify the root cause using Five Whys or fishbone analysis.
+    - Document lessons learned.
+    - Assign concrete action items with owners and due dates.
+  tags:
+    - debugging
+    - incident-response
+  verified: true
+
+- name: Redact sensitive data from logs
+  preconditions:
+    - Logs may contain passwords, tokens, PII, or payment data.
+  procedure:
+    - Identify all sensitive fields.
+    - Replace or mask them before logging.
+    - Use allowlists of safe fields when serializing objects.
+    - Audit existing logs for exposed secrets.
+    - Update logging policy and linters.
+  tags:
+    - debugging
+    - security
+  verified: true
+
+- name: Debug a build or dependency issue
+  preconditions:
+    - Builds fail inconsistently or produce different artifacts.
+  procedure:
+    - Clean build artifacts and dependency caches.
+    - Reinstall from lockfiles in a clean environment.
+    - Compare lockfiles and dependency trees between machines.
+    - Pin tool and base image versions.
+    - Reproduce in a container and compare hashes.
+  tags:
+    - debugging
+    - build
+  verified: true
+
+- name: Use a feature flag to safely debug production
+  preconditions:
+    - A bug only appears under real load or specific users.
+  procedure:
+    - Put the new behavior behind a feature flag.
+    - Enable it for a small cohort.
+    - Compare metrics, logs, and errors between cohorts.
+    - Disable the flag immediately if the bug appears.
+    - Iterate and expand only after validation.
+  tags:
+    - debugging
+    - production
+  verified: true
+
+- name: Capture and analyze a core dump
+  preconditions:
+    - A native program crashes in production or test.
+  procedure:
+    - Enable core dumps with ulimit -c unlimited or equivalent.
+    - Reproduce the crash.
+    - Load the core into the debugger with symbols available.
+    - Inspect the stack, registers, and local variables.
+    - Identify the faulting instruction and corrupt state.
+  tags:
+    - debugging
+    - systems
+  verified: true
+
+- name: Validate API responses at integration boundaries
+  preconditions:
+    - A client or server behaves differently than expected.
+  procedure:
+    - Capture request and response payloads.
+    - Validate against the published schema.
+    - Compare actual vs expected status, headers, and body.
+    - Mock the dependency to isolate client or server logic.
+    - Add contract tests.
+  tags:
+    - debugging
+    - api
+  verified: true
+
+- name: Debug an authentication or authorization failure
+  preconditions:
+    - A user or service is denied access unexpectedly.
+  procedure:
+    - Verify token validity, expiry, and issuer.
+    - Decode and inspect claims or roles.
+    - Check resource-level permissions.
+    - Compare headers between working and failing requests.
+    - Inspect identity provider and application logs.
+  tags:
+    - debugging
+    - security
+  verified: true
+
+- name: Use record-and-replay for nondeterministic bugs
+  preconditions:
+    - A bug is hard to reproduce because it depends on timing or external state.
+  procedure:
+    - Record the execution with rr or a similar tool.
+    - Replay and run to the failure point.
+    - Set watchpoints on suspicious variables.
+    - Run backward to find the first corrupting write.
+    - Fix the cause and re-record to verify.
+  tags:
+    - debugging
+    - systems
+  verified: true
+
+- name: Inspect a JVM thread dump
+  preconditions:
+    - A Java application hangs or is slow.
+  procedure:
+    - Use jstack <pid> or jcmd <pid> Thread.print.
+    - Identify blocked, waiting, or running threads.
+    - Look for deadlocks reported in the dump.
+    - Map thread state to application code.
+    - Fix synchronization or resource issues.
+  tags:
+    - debugging
+    - java
+    - concurrency
+  verified: true
+
+- name: Debug an out-of-memory error
+  preconditions:
+    - A process is killed or throws out-of-memory errors.
+  procedure:
+    - Determine if it is heap, stack, or native memory.
+    - Capture a heap dump or memory profile.
+    - Find the largest objects or allocation sites.
+    - Check for memory leaks, large caches, or unbounded buffers.
+    - Reduce memory usage or increase available memory.
+  tags:
+    - debugging
+    - memory
+    - performance
+  verified: true
+
+- name: Debug a timezone or timestamp bug
+  preconditions:
+    - Times are wrong, schedules drift, or comparisons fail.
+  procedure:
+    - Store and transmit times in UTC.
+    - Convert to local time only for display.
+    - Verify the tzdata version and system time.
+    - Check that all timestamps are timezone-aware.
+    - Add tests around DST transitions.
+  tags:
+    - debugging
+    - datetime
+  verified: true
+
+- name: Debug a front-end state mismatch
+  preconditions:
+    - The UI does not reflect the expected data.
+  procedure:
+    - Inspect component props and state in DevTools.
+    - Verify network requests and responses.
+    - Check cache invalidation and re-render triggers.
+    - Use time-travel debugging if available.
+    - Reproduce with the minimal component tree.
+  tags:
+    - debugging
+    - frontend
+  verified: true
+
+- name: Safely roll back a bad deployment
+  preconditions:
+    - A deployment introduced errors or latency.
+  procedure:
+    - Confirm the issue correlates with the deployment time.
+    - Identify the previous healthy version.
+    - Execute the rollback using the deployment tool.
+    - Monitor error rates and latency.
+    - Investigate the bad version in a non-production environment.
+  tags:
+    - debugging
+    - production
+    - incident-response
+  verified: true
+
+- name: Debug a message-queue issue
+  preconditions:
+    - Messages are lost, duplicated, or processed out of order.
+  procedure:
+    - Verify producer publishes the expected payload.
+    - Verify consumer receives and acknowledges messages.
+    - Check idempotency keys and ordering guarantees.
+    - Inspect dead-letter queues.
+    - Correlate logs with message IDs.
+  tags:
+    - debugging
+    - messaging
+  verified: true
+
+- name: Debug a configuration bug
+  preconditions:
+    - Behavior differs between environments.
+  procedure:
+    - Print effective configuration at startup with secrets redacted.
+    - Diff configuration between environments.
+    - Validate required settings and provide defaults.
+    - Check for environment-specific overrides.
+    - Add schema validation if missing.
+  tags:
+    - debugging
+    - configuration
+  verified: true
+
+- name: Find uninitialized memory use in C/C++
+  preconditions:
+    - Program behavior depends on uninitialized values.
+  procedure:
+    - Compile with -fsanitize=memory.
+    - Run under MemorySanitizer.
+    - Read the report for the use site and origin.
+    - Initialize the variable or allocate with calloc.
+    - Re-run until clean.
+  tags:
+    - debugging
+    - c
+    - cpp
+    - memory
+  verified: true
+
+- name: Debug a data pipeline discrepancy
+  preconditions:
+    - Output data is incorrect, missing, or schema-drifted.
+  procedure:
+    - Sample input and output records.
+    - Validate schemas at each stage.
+    - Compute per-stage row counts and checksums.
+    - Compare with a known good run.
+    - Use a diff tool for tabular data.
+  tags:
+    - debugging
+    - data
+  verified: true
+
+- name: Use a debugger watchpoint
+  preconditions:
+    - A variable is corrupted but you do not know when.
+  procedure:
+    - Start the debugger and run to the suspect region.
+    - Set a watchpoint on the variable or memory address.
+    - Continue execution.
+    - When the watchpoint hits, inspect the stack and code.
+    - Fix the write that violates the invariant.
+  tags:
+    - debugging
+    - systems
+  verified: true
+
+- name: Debug a Python import or module-load issue
+  preconditions:
+    - ImportError, ModuleNotFoundError, or unexpected module behavior.
+  procedure:
+    - Check sys.path and PYTHONPATH.
+    - Verify installed packages with pip list.
+    - Check for naming conflicts with standard library modules.
+    - Use python -v or PYTHONVERBOSE=1 to trace imports.
+    - Reinstall in a clean virtual environment.
+  tags:
+    - debugging
+    - python
+  verified: true
+
+- name: Debug a permission issue
+  preconditions:
+    - A file, network, or API operation fails with permission denied.
+  procedure:
+    - Verify the user identity running the process.
+    - Check file ownership, ACLs, and mode bits.
+    - Check SELinux/AppArmor denials.
+    - Verify network policies and firewall rules.
+    - Reproduce with a minimal command as the same user.
+  tags:
+    - debugging
+    - systems
+  verified: true

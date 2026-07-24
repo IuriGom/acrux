@@ -1,0 +1,135 @@
+- name: handle_swift_optionals
+  preconditions:
+    - Working with optional values in Swift
+  procedure:
+    - Prefer optional binding 'if let x = optional'
+    - Use 'guard let' for early returns
+    - Use nil-coalescing '??' for defaults
+    - Avoid force-unwrapping '!' unless absolutely certain
+    - Use optional chaining for nested properties
+  tags:
+    - swift
+    - optionals
+  verified: true
+
+- name: write_swift_concurrent_code
+  preconditions:
+    - Need concurrency in Swift
+  procedure:
+    - Use 'async/await' and 'Task' for structured concurrency
+    - Use actors to protect mutable shared state
+    - Prefer 'TaskGroup' for dynamic parallel work
+    - Use '@MainActor' for UI updates
+    - Avoid mixing GCD and async/await unless necessary
+  tags:
+    - swift
+    - concurrency
+  verified: true
+
+- name: build_swift_package
+  preconditions:
+    - Working with a Swift Package Manager project
+  procedure:
+    - Define targets and dependencies in Package.swift
+    - Run 'swift build' to compile
+    - Run 'swift test' to execute tests
+    - Use 'swift package resolve' to fetch dependencies
+    - Keep semantic version constraints reasonable
+  tags:
+    - swift
+    - spm
+  verified: true
+
+- name: write_swiftui_view
+  preconditions:
+    - Building a UI with SwiftUI
+  procedure:
+    - Create a struct conforming to 'View'
+    - Implement the 'body' computed property
+    - Use '@State' for local mutable state
+    - Use '@ObservedObject' or '@StateObject' for external models
+    - Use modifiers to style and layout views
+  tags:
+    - swift
+    - swiftui
+  verified: true
+
+- name: parse_json_swift
+  preconditions:
+    - Need JSON parsing in Swift
+  procedure:
+    - Define a Codable model matching JSON structure
+    - "Use 'JSONDecoder().decode(Type.self, from: data)'"
+    - Use 'JSONEncoder' for serialization
+    - Handle decoding errors with do-catch
+  tags:
+    - swift
+    - json
+  verified: true
+
+- name: manage_memory_swift
+  preconditions:
+    - Avoiding retain cycles in Swift
+  procedure:
+    - Use weak references for delegates and closures capturing self
+    - Use unowned only when reference is guaranteed to outlive closure
+    - Break strong reference cycles in closures with '[weak self]'
+    - Review object graphs for unexpected retention
+  tags:
+    - swift
+    - memory
+  verified: true
+
+- name: use_swift_protocols
+  preconditions:
+    - Designing reusable Swift interfaces
+  procedure:
+    - Define protocols with focused requirements
+    - Use protocol extensions for default implementations
+    - Use associated types for generic protocols
+    - Prefer protocol-oriented programming over deep inheritance
+  tags:
+    - swift
+    - protocols
+  verified: true
+
+- name: write_swift_unit_test
+  preconditions:
+    - Testing Swift code
+  procedure:
+    - Use XCTest framework
+    - Create test classes subclassing XCTestCase
+    - Name tests descriptively
+    - Use 'setUp' and 'tearDown' for shared state
+    - Use '#expect' in Swift Testing if available
+  tags:
+    - swift
+    - testing
+  verified: true
+
+- name: handle_swift_errors
+  preconditions:
+    - Functions may fail in Swift
+  procedure:
+    - Mark functions with 'throws'
+    - Use 'do-catch' to handle errors
+    - Use 'try?' to convert result to optional
+    - Use 'try!' only when failure is a programming error
+    - Define custom Error conformances for domain errors
+  tags:
+    - swift
+    - error-handling
+  verified: true
+
+- name: interop_with_objective_c
+  preconditions:
+    - Calling Objective-C from Swift
+  procedure:
+    - Import Objective-C headers via bridging header or module map
+    - Use '@objc' and '@objcMembers' for Swift classes exposed to Objective-C
+    - Convert 'NSString' to 'String' automatically
+    - Handle nullable Objective-C references as optionals
+  tags:
+    - swift
+    - objc
+  verified: true

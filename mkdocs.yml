@@ -1,0 +1,23 @@
+site_name: Acrux
+site_description: Local-first memory and learning daemon for coding agents
+site_author: Acrux Project
+
+docs_dir: docs
+
+theme:
+  name: readthedocs
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Architecture: architecture.md
+  - Operating Guide: OPERATING.md
+  - Installation Plan: installation-plan.md
+  - System Prompt Plan: system_prompt_plan.md
+  - Acrux Spec: spec.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true

@@ -1,0 +1,496 @@
+- name: Perform threat modeling with STRIDE
+  preconditions:
+    - Designing or significantly changing a feature, API, or system.
+    - Need to identify threats before writing code.
+  procedure:
+    - Draw a data-flow diagram showing processes, data stores, external entities, and trust boundaries.
+    - List assets and classify data sensitivity.
+    - Apply STRIDE to each element and data flow.
+    - Document threats, risk ratings, and proposed mitigations.
+    - Turn mitigations into implementation tasks and tests.
+    - Revisit the model after major changes.
+  tags:
+    - security
+    - threat-modeling
+    - design
+  verified: true
+
+- name: Implement secure input validation
+  preconditions:
+    - Receiving untrusted data from users, APIs, files, or external systems.
+    - Need to enforce business rules and reduce injection risk.
+  procedure:
+    - Define the allowed type, length, range, format, and character set for each field.
+    - Use allowlists; avoid denylists as the primary control.
+    - Validate on the server before any processing.
+    - Normalize Unicode, paths, and URLs before validation.
+    - Reject invalid input with a generic message; log details securely.
+    - Apply context-aware output encoding when rendering data.
+  tags:
+    - security
+    - input-validation
+    - defensive-coding
+  verified: true
+
+- name: Write parameterized database queries
+  preconditions:
+    - Querying a database with values influenced by user input.
+    - Need to prevent SQL/NoSQL injection.
+  procedure:
+    - Use prepared statements or parameterized queries provided by the driver/ORM.
+    - Never concatenate or interpolate user data into query strings.
+    - Use allowlists for dynamic identifiers (table/column names) if unavoidable.
+    - Run with least-privilege database accounts.
+    - Add tests that attempt injection and verify no data leakage.
+  tags:
+    - security
+    - sql-injection
+    - database
+  verified: true
+
+- name: Store passwords with modern hashing
+  preconditions:
+    - Storing credentials for local authentication.
+    - Need to protect passwords if the database is compromised.
+  procedure:
+    - Use Argon2id as the default; fallback to scrypt or bcrypt only when necessary.
+    - Configure memory/time/parallelism parameters appropriate to server capacity.
+    - Let the library generate and manage salts automatically.
+    - Consider a pepper stored separately for defense in depth.
+    - Verify with the library's constant-time verify function.
+    - Plan for work-factor upgrades on next successful login.
+  tags:
+    - security
+    - authentication
+    - cryptography
+  verified: true
+
+- name: Issue and validate JSON Web Tokens securely
+  preconditions:
+    - Building stateless or distributed authentication.
+    - Need signed tokens with claims.
+  procedure:
+    - Choose RS256/ES256 for multi-service verification; HS256 only for single trusted issuer/verifier.
+    - Explicitly allow only the expected algorithm; reject none/NULL.
+    - Include exp, iat, iss, aud, sub, and jti claims.
+    - Use short expiry; pair access tokens with refresh-token rotation or short sessions.
+    - Validate issuer, audience, expiry, and signature on every request.
+    - Encrypt the JWT if it contains sensitive claims.
+  tags:
+    - security
+    - jwt
+    - authentication
+  verified: true
+
+- name: Enforce authorization on every request
+  preconditions:
+    - An authenticated user may request resources or actions belonging to others.
+    - Need to prevent broken access control and IDOR.
+  procedure:
+    - Adopt deny-by-default.
+    - Check both authentication and authorization for the specific resource and action.
+    - Use RBAC, ABAC, or ReBAC based on requirements.
+    - Implement authorization in middleware or service layer close to data.
+    - Add unit and integration tests for horizontal and vertical escalation.
+    - Never rely on client-side checks or obscure IDs alone.
+  tags:
+    - security
+    - authorization
+    - access-control
+  verified: true
+
+- name: Set secure HTTP cookies
+  preconditions:
+    - Using browser cookies for session or token storage.
+    - Need to mitigate XSS and CSRF.
+  procedure:
+    - Mark cookies as HttpOnly unless JavaScript truly needs access.
+    - Set Secure so cookies are sent only over HTTPS.
+    - Set SameSite=Strict or Lax.
+    - Use Path=/ or narrower scopes.
+    - Keep expiration short; regenerate session ID on privilege changes.
+    - Use __Host- or __Secure- prefixes for additional protection.
+  tags:
+    - security
+    - session-management
+    - web
+  verified: true
+
+- name: Configure Content Security Policy
+  preconditions:
+    - Serving HTML responses.
+    - Need defense-in-depth against XSS and clickjacking.
+  procedure:
+    - Start with a strict nonce-based or hash-based policy.
+    - Avoid unsafe-inline and unsafe-eval.
+    - Set object-src 'none' and base-uri 'none'.
+    - Use frame-ancestors to prevent clickjacking.
+    - Report violations via report-to/report-uri.
+    - Test in report-only mode before enforcing.
+  tags:
+    - security
+    - csp
+    - web
+  verified: true
+
+- name: Harden TLS for a web server
+  preconditions:
+    - Serving HTTPS traffic.
+    - Need confidentiality, integrity, and server authentication.
+  procedure:
+    - Enable TLS 1.3 and TLS 1.2 only; disable older protocols.
+    - Use AEAD cipher suites; disable NULL, EXPORT, RC4, CBC-only, and RSA key transport.
+    - Disable TLS compression.
+    - Use strong certificates (SHA-256, SAN, RSA 2048+/ECC 256+).
+    - Configure HSTS with includeSubDomains and preload.
+    - Test with SSL Labs, testssl.sh, or SSLyze.
+  tags:
+    - security
+    - tls
+    - networking
+  verified: true
+
+- name: Prevent cross-site scripting (XSS)
+  preconditions:
+    - Rendering user-controlled data in HTML, JavaScript, URLs, or CSS.
+    - Need to prevent script injection.
+  procedure:
+    - Encode output for the specific context (HTML, attribute, JS, URL, CSS).
+    - Use framework auto-escaping.
+    - Sanitize HTML with a dedicated library if rich content is required.
+    - Avoid innerHTML, document.write, eval, and inline event handlers.
+    - Set a strict CSP.
+    - Validate input types but rely on output encoding for XSS prevention.
+  tags:
+    - security
+    - xss
+    - web
+  verified: true
+
+- name: Prevent cross-site request forgery (CSRF)
+  preconditions:
+    - State-changing actions reachable through browser requests.
+    - Users are authenticated with session cookies.
+  procedure:
+    - Use synchronizer tokens for server-rendered forms.
+    - Set SameSite=Strict or Lax on session cookies.
+    - Require custom headers for API requests.
+    - Re-authenticate for high-value actions.
+    - Validate Origin/Referer as a secondary check.
+    - Avoid GET requests for state-changing operations.
+  tags:
+    - security
+    - csrf
+    - web
+  verified: true
+
+- name: Prevent server-side request forgery (SSRF)
+  preconditions:
+    - Application fetches URLs provided or influenced by users.
+    - Need to restrict outbound requests.
+  procedure:
+    - Allowlist allowed schemes, hosts, and ports.
+    - Resolve hostnames and block private/link-local/multicast IPs.
+    - Disable unused URL schemes such as file, gopher, ftp.
+    - Use a dedicated egress proxy with logging.
+    - Do not return raw responses to users.
+    - Handle errors generically to avoid information leakage.
+  tags:
+    - security
+    - ssrf
+    - networking
+  verified: true
+
+- name: Manage secrets securely
+  preconditions:
+    - Application needs API keys, passwords, signing keys, or certificates.
+    - Need to prevent leakage and enable rotation.
+  procedure:
+    - Store secrets in a vault or KMS, never in source code.
+    - Inject secrets at runtime via files or environment variables.
+    - Scan git history and CI outputs for accidental leaks.
+    - Use short-lived credentials and workload identity where possible.
+    - Rotate secrets on compromise, employee departure, or schedule.
+    - Audit access to secrets.
+  tags:
+    - security
+    - secrets-management
+    - vault
+  verified: true
+
+- name: Encrypt data at rest with envelope encryption
+  preconditions:
+    - Storing sensitive data in a database, object store, or filesystem.
+    - Need to protect against unauthorized data access.
+  procedure:
+    - Generate a random data encryption key (DEK) per item or batch.
+    - Encrypt data with the DEK using AES-256-GCM or ChaCha20-Poly1305.
+    - Encrypt the DEK with a key encryption key (KEK) from a KMS/HSM.
+    - Store the encrypted DEK alongside the ciphertext, tagged with key version.
+    - Rotate KEKs and re-encrypt DEKs periodically or on compromise.
+    - Never store the KEK with the data it protects.
+  tags:
+    - security
+    - cryptography
+    - data-protection
+  verified: true
+
+- name: Scan dependencies for vulnerabilities
+  preconditions:
+    - Project uses third-party libraries or containers.
+    - Need to identify and remediate known CVEs.
+  procedure:
+    - Maintain accurate lockfiles and an SBOM.
+    - Run SCA tools (Snyk, pip-audit, npm audit, cargo audit, Trivy) in CI.
+    - Prioritize by severity, exploitability (EPSS), and CISA KEV status.
+    - Establish patching SLAs for critical/high findings.
+    - Review new dependencies before adding them.
+    - Subscribe to security advisories for key dependencies.
+  tags:
+    - security
+    - supply-chain
+    - sca
+  verified: true
+
+- name: Secure a container image
+  preconditions:
+    - Building and deploying containerized applications.
+    - Need to reduce attack surface.
+  procedure:
+    - Use minimal base images and pin digests.
+    - Run as non-root with a read-only root filesystem.
+    - Drop all capabilities and add back only what is required.
+    - Do not bake secrets into images.
+    - Scan images for CVEs before deployment.
+    - Sign images and verify signatures at runtime.
+    - Apply seccomp, AppArmor, or SELinux profiles.
+  tags:
+    - security
+    - containers
+    - docker
+  verified: true
+
+- name: Set up SAST and DAST in CI
+  preconditions:
+    - Need continuous automated security testing.
+    - Want to catch issues before production.
+  procedure:
+    - Choose SAST tools matching your language (Semgrep, Bandit, CodeQL, SonarQube).
+    - Run SAST on every pull request and fail on critical/high findings.
+    - Run secrets scanning (Gitleaks, TruffleHog) on commits and history.
+    - Deploy to a staging environment and run DAST (OWASP ZAP, Burp Suite).
+    - Triage findings and feed them into the backlog.
+    - Track metrics such as MTTR and scan coverage.
+  tags:
+    - security
+    - sast
+    - dast
+    - ci-cd
+  verified: true
+
+- name: Conduct a secure code review
+  preconditions:
+    - A pull request introduces new code or changes security-critical areas.
+    - Need to catch flaws before merge.
+  procedure:
+    - Review input validation, output encoding, and query parameterization.
+    - Check authentication and authorization logic.
+    - Look for hard-coded secrets, tokens, or passwords.
+    - Verify error handling does not leak internals.
+    - Assess new dependencies and configuration changes.
+    - Confirm tests cover security requirements and abuse cases.
+    - Use a checklist and document findings.
+  tags:
+    - security
+    - code-review
+    - sdlc
+  verified: true
+
+- name: Respond to a security incident
+  preconditions:
+    - A suspected or confirmed security breach, vulnerability exploitation, or data exposure.
+    - Need to contain impact and recover.
+  procedure:
+    - Identify and confirm the incident from logs, alerts, or reports.
+    - Contain by isolating affected systems, revoking sessions, and rotating keys.
+    - Eradicate root cause (patch, remove malware, fix misconfiguration).
+    - Recover from known-good backups and verify integrity.
+    - Communicate internally and externally per policy and regulations.
+    - Run a blameless post-mortem and update controls.
+  tags:
+    - security
+    - incident-response
+    - operations
+  verified: true
+
+- name: Implement API rate limiting
+  preconditions:
+    - Public or internal API may be abused by automated clients.
+    - Need to prevent brute force, scraping, or DoS.
+  procedure:
+    - Define limits per client, user, or IP based on endpoint cost.
+    - Use token-bucket or sliding-window algorithms backed by Redis or similar.
+    - Return 429 with Retry-After headers.
+    - Log rate-limit events for detection.
+    - Apply stricter limits for authentication endpoints.
+    - Test limits under load.
+  tags:
+    - security
+    - api
+    - rate-limiting
+  verified: true
+
+- name: Validate and store file uploads safely
+  preconditions:
+    - Users can upload files.
+    - Need to prevent malicious uploads and path traversal.
+  procedure:
+    - Enforce maximum file size and compression limits.
+    - Verify actual file type via magic bytes, not just extension.
+    - Allowlist permitted types.
+    - Rename files with random names; do not use user-supplied filenames.
+    - Store outside the web root or serve via a handler.
+    - Scan uploaded files for malware.
+    - Set correct Content-Type and Content-Disposition headers.
+  tags:
+    - security
+    - file-upload
+    - web
+  verified: true
+
+- name: Rotate cryptographic keys
+  preconditions:
+    - A key is compromised, reaches its cryptoperiod, or a new algorithm is required.
+    - Need to maintain data availability while rotating.
+  procedure:
+    - Generate the new key and mark it as primary for encryption.
+    - Keep old keys available for decryption only.
+    - Tag ciphertext with the key identifier or version.
+    - Re-encrypt data on read or via a background job.
+    - After grace period and verification, retire old keys.
+    - Document and test the rotation runbook.
+  tags:
+    - security
+    - cryptography
+    - key-management
+  verified: true
+
+- name: Configure Cross-Origin Resource Sharing safely
+  preconditions:
+    - A web API is accessed from browser JavaScript on different origins.
+    - Need to allow legitimate cross-origin requests without opening attacks.
+  procedure:
+    - Maintain an explicit allowlist of trusted origins.
+    - Do not reflect arbitrary Origin headers.
+    - Never use wildcard with credentials allowed.
+    - Restrict allowed methods and headers to the minimum required.
+    - Keep preflight cache short.
+    - Validate origin server-side before setting CORS headers.
+  tags:
+    - security
+    - cors
+    - web
+  verified: true
+
+- name: Handle exceptions without information disclosure
+  preconditions:
+    - Application may raise errors in production.
+    - Need to avoid leaking stack traces or internals.
+  procedure:
+    - Catch exceptions centrally near the request boundary.
+    - Log full details (stack trace, request id, user) internally.
+    - Return generic, safe messages to clients.
+    - Map expected errors to appropriate HTTP status codes.
+    - Alert on unexpected error spikes.
+    - Ensure debug mode is disabled in production.
+  tags:
+    - security
+    - error-handling
+    - defensive-coding
+  verified: true
+
+- name: Integrate OAuth 2.1 / OpenID Connect
+  preconditions:
+    - Users authenticate via an external identity provider.
+    - Need delegated authorization or SSO.
+  procedure:
+    - Register a confidential or public client and store credentials securely.
+    - Use Authorization Code Flow with PKCE for public clients.
+    - Validate state parameter to prevent CSRF.
+    - Exchange code for tokens over TLS.
+    - Validate ID token signature, issuer, audience, and expiry.
+    - Issue local session; store tokens securely.
+  tags:
+    - security
+    - oauth
+    - oidc
+    - authentication
+  verified: true
+
+- name: Build a secure CI/CD pipeline
+  preconditions:
+    - Code is built, tested, and deployed automatically.
+    - Need to protect the supply chain.
+  procedure:
+    - Require signed commits and branch protection.
+    - Run SAST, secrets scanning, dependency scanning, and tests on every PR.
+    - Pin CI actions/tools by digest, not mutable tag.
+    - Use short-lived OIDC credentials instead of long-lived secrets.
+    - Build in isolated environments and produce SBOMs.
+    - Sign container images and artifacts.
+    - Scan images before deploy and monitor post-deploy.
+  tags:
+    - security
+    - ci-cd
+    - supply-chain
+  verified: true
+
+- name: Implement least-privilege IAM
+  preconditions:
+    - Defining cloud, database, or application permissions.
+    - Need to limit blast radius.
+  procedure:
+    - Start with zero permissions.
+    - Add only the minimum actions and resources required.
+    - Use roles instead of users where possible.
+    - Apply time-bound and just-in-time access for elevated roles.
+    - Regularly review and remove unused permissions.
+    - Enforce MFA for privileged access.
+  tags:
+    - security
+    - iam
+    - least-privilege
+  verified: true
+
+- name: Protect against deserialization attacks
+  preconditions:
+    - Application deserializes data from untrusted sources.
+    - Need to prevent remote code execution.
+  procedure:
+    - Avoid native binary deserialization of untrusted data.
+    - Prefer JSON, msgpack, or protobuf with strict schema validation.
+    - If native serialization is required, sign with HMAC and verify before deserializing.
+    - Keep serialization libraries patched.
+    - Run deserialization in a sandboxed process where feasible.
+  tags:
+    - security
+    - deserialization
+    - rce-prevention
+  verified: true
+
+- name: Perform vulnerability triage
+  preconditions:
+    - Scanners or researchers report vulnerabilities.
+    - Need to prioritize remediation.
+  procedure:
+    - Confirm the finding is valid and reproducible.
+    - Identify affected assets, versions, and exposure.
+    - Score using CVSS and consider EPSS/KEV for prioritization.
+    - Determine exploitability in your environment.
+    - Assign owner and remediation SLA.
+    - Retest after fix and document resolution.
+  tags:
+    - security
+    - vulnerability-management
+    - triage
+  verified: true

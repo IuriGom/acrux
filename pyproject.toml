@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acrux"
+version = "1.0.0"
+description = "Local memory and learning system for coding agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Acrux Project"}
+]
+dependencies = [
+    "click>=8.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "cryptography>=41.0",
+    "httpx>=0.25",
+    "mcp>=1.0",
+    "uvicorn[standard]>=0.24",
+    "starlette>=0.27",
+    "croniter>=2.0",
+    "fastapi>=0.100",
+    "websockets>=12.0",
+    "psutil>=5.9",
+    "tree-sitter>=0.21",
+    "hnswlib>=0.8",
+    "duckduckgo-search>=8.0",
+    "trafilatura>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+treesitter = [
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-go",
+    "tree-sitter-rust",
+    "tree-sitter-java",
+    "tree-sitter-c",
+    "tree-sitter-cpp",
+    "tree-sitter-swift",
+]
+docs = ["mkdocs>=1.5"]
+
+[project.scripts]
+acrux = "acrux.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["acrux*"]
+
+[tool.ruff]
+line-length = 100
