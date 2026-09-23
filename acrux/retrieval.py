@@ -169,6 +169,10 @@ async def recall_context(
     skills = rank_skills(procedural.search_fts(project, query, k) if hasattr(procedural, "search_fts") else procedural.search(project, query, k))
     inh_skills = inherited_skills(procedural_resolver, semantic, project, query, k)
     inh_facts = inherited_facts(semantic, project, query, k)
+    # Effective facts include the project's own memories; drop copies already
+    # present in the local results so they are not packed twice.
+    local_fact_ids = {f.id for f in facts}
+    inh_facts = [item for item in inh_facts if item.get("id") not in local_fact_ids]
 
     latency_ms = (time.time() - start) * 1000
     try:
