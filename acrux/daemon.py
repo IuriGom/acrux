@@ -207,8 +207,6 @@ class AcruxDaemon:
         except Exception as exc:
             self.logger.warning("Fact verification failed: %s", exc)
             return None
-        except Exception as exc:
-            self.logger.exception("Scheduled re-verification failed for %s: %s", project, exc)
 
 
 async def run_daemon(config: AcruxConfig) -> None:

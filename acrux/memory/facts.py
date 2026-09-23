@@ -517,7 +517,14 @@ class FactStoreMixin:
         if cluster_id is not None:
             base += " AND cluster_id = ?"
             params.append(cluster_id)
-        allowed_orders = {"timestamp DESC", "timestamp ASC", "confidence DESC", "decay_score DESC"}
+        allowed_orders = {
+            "timestamp DESC",
+            "timestamp ASC",
+            "confidence DESC",
+            "confidence ASC, timestamp ASC",
+            "stale DESC, confidence ASC, timestamp ASC",
+            "decay_score DESC",
+        }
         if order_by not in allowed_orders:
             order_by = "timestamp DESC"
         base += f" ORDER BY {order_by} LIMIT ? OFFSET ?"
@@ -600,11 +607,11 @@ class FactStoreMixin:
         ]
 
     def get_facts_for_reverify(self, project: str, limit: int = 10) -> list[Fact]:
-        """Return oldest, least-confident, non-stale facts first."""
+        """Return facts to re-check: stale first, then least-confident, oldest first."""
         rows = self._list_facts(
             project,
             limit=limit,
-            order_by="confidence ASC, timestamp ASC",
+            order_by="stale DESC, confidence ASC, timestamp ASC",
         )
         return [self._row_to_fact(row) for row in rows]
 
@@ -615,6 +622,8 @@ class FactStoreMixin:
         verdict_lower = verdict.lower()
         if verdict_lower == "yes":
             fact.verified_count += 1
+            # A fresh confirmation rehabilitates a stale fact.
+            fact.stale = False
         elif verdict_lower == "no":
             fact.contradicted_count += 1
         elif verdict_lower == "uncertain":
