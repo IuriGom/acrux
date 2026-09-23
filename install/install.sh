@@ -33,7 +33,7 @@ set -eu
 INSTALL_HOME="${PIA_HOME:-$HOME/.pia}"      # install prefix; venv at $INSTALL_HOME/venv
 ACRUX_HOME="${ACRUX_HOME:-$HOME/.acrux}"     # acrux config + data (see acrux/config.py)
 # TODO: point this at the real GitHub org/user before publishing releases.
-ACRUX_GH_REPO="${ACRUX_GH_REPO:-IuriGom/acrux}"
+ACRUX_GH_REPO="${ACRUX_GH_REPO:-acrux-project/acrux}"
 ACRUX_VERSION="${ACRUX_VERSION:-1.0.0}"   # release version for the stable channel
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"  # interpreter requested from uv
 CHANNEL="stable"                          # stable | main
@@ -257,6 +257,9 @@ install_package() {
 # ---------------------------------------------------------------------------
 run_init() {
     CONFIG_HOME="${ACRUX_HOME:-$HOME/.acrux}"
+    # Point the Acrux app at this install so it can find the venv/package.
+    mkdir -p "$CONFIG_HOME"
+    printf '%s\n' "$INSTALL_HOME" > "$CONFIG_HOME/project_dir"
     if [ -f "$CONFIG_HOME/config.yaml" ]; then
         log "Keeping existing config at $CONFIG_HOME/config.yaml (init skipped)"
         return 0

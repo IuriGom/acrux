@@ -38,7 +38,9 @@ class AcruxDaemon:
         self.logger.info("Starting acrux daemon (transport=%s)", self.config.mcp.transport)
         server_task = asyncio.create_task(self._run_server())
         scheduler_task = asyncio.create_task(self._run_scheduler())
-        app_task = asyncio.create_task(self._run_app_server())
+        # NOTE: the daemon deliberately does NOT serve the app API (port 11438).
+        # The Acrux app spawns and owns its own backend; two owners of the port
+        # made them kill each other.
         self.kimi_watcher.start()
         self.claude_watcher.start()
         self.logger.info("Kimi and Claude session watchers started")
@@ -48,7 +50,7 @@ class AcruxDaemon:
         finally:
             self.kimi_watcher.stop()
             self.claude_watcher.stop()
-            for task in (server_task, scheduler_task, app_task):
+            for task in (server_task, scheduler_task):
                 task.cancel()
                 try:
                     await task
@@ -69,18 +71,6 @@ class AcruxDaemon:
 
             server = AcruxMCPServer(self.config)
             await server.run()
-
-    async def _run_app_server(self) -> None:
-        """Serve the FastAPI app in the same daemon process."""
-        import uvicorn
-
-        from acrux.app.main import app
-
-        port = int(getattr(self.config, "app_port", 11438))
-        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-        server = uvicorn.Server(config)
-        self.logger.info("Starting acrux app server on port %d", port)
-        await server.serve()
 
     async def _run_scheduler(self) -> None:
         if self.config.reflection.provider == "none":
@@ -155,7 +145,7 @@ class AcruxDaemon:
                     result["facts"],
                     result["skills"],
                 )
-                verify_results = SkillVerifier(episodic, procedural).verify_project(project_dir.name)
+                verify_results = await SkillVerifier(episodic, procedural).verify_project(project_dir.name)
                 verified = sum(1 for errs in verify_results.values() if not errs)
                 if verified:
                     self.logger.info(

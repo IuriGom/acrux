@@ -84,7 +84,7 @@ class ReflectionEngine:
             for skill in skills:
                 skill.project = project
                 skill.tags = list(set(skill.tags + ["correction"]))
-                ok, errors = verifier.verify(skill)
+                ok, errors = await verifier.verify(skill)
                 if ok:
                     self.procedural.add_pending(skill)
                     validated += 1
@@ -108,7 +108,7 @@ class ReflectionEngine:
                 validated = 0
                 for skill in skills:
                     skill.project = project
-                    ok, errors = verifier.verify(skill)
+                    ok, errors = await verifier.verify(skill)
                     if ok:
                         self.procedural.add_pending(skill)
                         validated += 1
@@ -130,7 +130,7 @@ class ReflectionEngine:
                 validated = 0
                 for skill in skills:
                     skill.project = project
-                    ok, errors = verifier.verify(skill)
+                    ok, errors = await verifier.verify(skill)
                     if ok:
                         self.procedural.add_pending(skill)
                         validated += 1

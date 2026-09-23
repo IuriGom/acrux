@@ -943,6 +943,12 @@ class FactStoreMixin:
     # ------------------------------------------------------------------
 
     def _row_to_fact(self, row: sqlite3.Row) -> Fact:
+        # pending_facts has a narrower schema than facts; default missing columns.
+        keys = set(row.keys())
+
+        def get(key: str, default: Any = None) -> Any:
+            return row[key] if key in keys else default
+
         return Fact(
             id=row["id"],
             project=row["project"] or "default",
@@ -955,14 +961,14 @@ class FactStoreMixin:
             contradicted_count=row["contradicted_count"] or 0,
             stale=bool(row["stale"]),
             git_info=json.loads(row["git_info"]) if row["git_info"] else None,
-            parent_id=row["parent_id"],
-            version_group_id=row["version_group_id"],
-            is_current=bool(row["is_current"]),
+            parent_id=get("parent_id"),
+            version_group_id=get("version_group_id"),
+            is_current=bool(get("is_current", 1)),
             fact_type=row["fact_type"] or "positive",
             cluster_id=row["cluster_id"],
-            inheritance_mode=row["inheritance_mode"] or "none",
-            decay_score=row["decay_score"] if row["decay_score"] is not None else 0.0,
-            last_recalled_at=row["last_recalled_at"],
-            checksum=row["checksum"],
-            recall_count=row["recall_count"] if row["recall_count"] is not None else 0,
+            inheritance_mode=get("inheritance_mode") or "none",
+            decay_score=get("decay_score") or 0.0,
+            last_recalled_at=get("last_recalled_at"),
+            checksum=get("checksum"),
+            recall_count=get("recall_count") or 0,
         )

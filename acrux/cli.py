@@ -24,6 +24,7 @@ from acrux.mcp_server import AcruxMCPServer
 from acrux.models import Action, Episode, Skill
 from acrux.reflection.engine import ReflectionEngine
 from acrux.utils import (
+    DAEMON_PID_FILE,
     PidFile,
     format_bytes,
     get_logger,
@@ -108,7 +109,7 @@ def start(
         if transport == "stdio":
             click.echo("Cannot run stdio MCP transport in background. Use --mcp http.", err=True)
             sys.exit(1)
-        pid_file = PidFile()
+        pid_file = PidFile(DAEMON_PID_FILE)
         if pid_file.is_running():
             click.echo(f"acrux already running (pid {pid_file.read()}).")
             return
@@ -166,7 +167,7 @@ def daemon(
     port = port or cfg.mcp.port
 
     if background:
-        pid_file = PidFile()
+        pid_file = PidFile(DAEMON_PID_FILE)
         if pid_file.is_running():
             click.echo(f"acrux already running (pid {pid_file.read()}).")
             return
@@ -193,7 +194,7 @@ def daemon(
 @cli.command()
 def stop() -> None:
     """Stop a background acrux server."""
-    pid_file = PidFile()
+    pid_file = PidFile(DAEMON_PID_FILE)
     if not pid_file.is_running():
         click.echo("acrux is not running.")
         return
@@ -210,7 +211,7 @@ def stop() -> None:
 def status(ctx: click.Context, storage: bool) -> None:
     """Show acrux status."""
     cfg = ctx.obj["config"]
-    pid_file = PidFile()
+    pid_file = PidFile(DAEMON_PID_FILE)
     click.echo(f"Profile: {cfg.profile}")
     click.echo(f"Data dir: {cfg.data_dir}")
     click.echo(f"Reflection provider: {cfg.reflection.provider}")
@@ -614,7 +615,7 @@ def verify_skills(ctx: click.Context, project: str | None, execute: bool, worksp
         verifier = SkillVerifier(episodic, procedural)
 
         # Verify live skills
-        live_results = verifier.verify_project(proj)
+        live_results = asyncio.run(verifier.verify_project(proj))
         live_verified = sum(1 for errs in live_results.values() if not errs)
         live_failed = len(live_results) - live_verified
         click.echo(f"{proj}: {live_verified} live verified, {live_failed} live failed")
@@ -627,7 +628,7 @@ def verify_skills(ctx: click.Context, project: str | None, execute: bool, worksp
         promoted = 0
         still_pending = 0
         for skill in pending:
-            ok, errors = verifier.verify(skill)
+            ok, errors = asyncio.run(verifier.verify(skill))
             if ok:
                 if execute:
                     script = "\n".join(skill.procedure)

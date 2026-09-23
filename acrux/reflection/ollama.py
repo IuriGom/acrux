@@ -16,12 +16,18 @@ class OllamaProvider(ReflectionProvider):
         self.host = host.rstrip("/")
         self.client = httpx.AsyncClient(timeout=600.0)
 
-    async def reflect_episodes(self, episodes: list[Episode]) -> list[Fact]:
+    async def reflect_episodes(self, episodes: list[Episode], retries: int = 2) -> list[Fact]:
         if not episodes:
             return []
-        prompt = self.build_reflection_prompt(episodes)
-        response = await self._generate(prompt)
-        return self._parse_facts_json(response, episodes)
+        # Small models intermittently bail with "[]" on borderline input even
+        # when facts exist; retry a couple of times before accepting empty.
+        for attempt in range(retries + 1):
+            prompt = self.build_reflection_prompt(episodes)
+            response = await self._generate(prompt)
+            facts = self._parse_facts_json(response, episodes)
+            if facts:
+                return facts
+        return []
 
     async def extract_skills(
         self, episodes: list[Episode], facts: list[Fact], retries: int = 2
@@ -40,12 +46,16 @@ class OllamaProvider(ReflectionProvider):
                 continue
         return []
 
-    async def reflect_kimi_episodes(self, episodes: list[Episode]) -> list[Fact]:
+    async def reflect_kimi_episodes(self, episodes: list[Episode], retries: int = 2) -> list[Fact]:
         if not episodes:
             return []
-        prompt = self.build_kimi_reflection_prompt(episodes)
-        response = await self._generate(prompt, temperature=0.15)
-        return self._parse_facts_json(response, episodes, source_override="kimi-reflection")
+        for attempt in range(retries + 1):
+            prompt = self.build_kimi_reflection_prompt(episodes)
+            response = await self._generate(prompt, temperature=0.15)
+            facts = self._parse_facts_json(response, episodes, source_override="kimi-reflection")
+            if facts:
+                return facts
+        return []
 
     async def extract_kimi_skills(
         self, episodes: list[Episode], facts: list[Fact], retries: int = 2
@@ -71,7 +81,15 @@ class OllamaProvider(ReflectionProvider):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": temperature, "num_predict": 1024},
+            # Disable reasoning-mode: thinking tokens count against num_predict,
+            # and when the trace is long the actual response comes back EMPTY,
+            # which silently yielded "+0 facts" reflections. The /no_think prompt
+            # prefix is not honored through /api/generate; this flag is.
+            "think": False,
+            # Reflection prompts are short; don't let the server's global
+            # OLLAMA_CONTEXT_LENGTH (256k) inflate the KV cache. At 256k even a
+            # 4B model allocates ~23 GB of context and swaps itself to death.
+            "options": {"temperature": temperature, "num_predict": 1024, "num_ctx": 16384},
         }
         response = await self.client.post(url, json=payload)
         response.raise_for_status()

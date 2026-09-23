@@ -24,6 +24,7 @@ import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -47,7 +48,7 @@ from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.memory.semantic import SemanticStore
 from acrux.models import Action, Episode, Fact
 from acrux.sandbox import run_sandboxed
-from acrux.utils import PidFile, available_ram_mb, degraded_reason, git_context, is_degraded
+from acrux.utils import DAEMON_PID_FILE, PidFile, available_ram_mb, degraded_reason, git_context, is_degraded
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 APP_DIR = Path.home() / ".acrux" / "app"
@@ -189,14 +190,14 @@ def _project_for(workspace: str) -> str:
 
 async def _recall_context(project: str, query: str, limit: int = 6) -> str:
     """Build a tagged memory context block for injection into the system prompt."""
-    from acrux.retrieval import Stores, recall_context
+    from acrux.retrieval import recall_context
 
     if not query.strip():
         return ""
     semantic = _project_semantic(project)
     episodic = _project_episodic(project)
     procedural = _project_procedural(project)
-    stores = Stores(semantic=semantic, episodic=episodic, procedural=procedural)
+    stores = SimpleNamespace(semantic=semantic, episodic=episodic, procedural=procedural)
     return await recall_context(
         stores,
         _project_procedural,
@@ -216,7 +217,8 @@ def _record_memory_outcomes(project: str, memory_context: str, success: bool = T
 
 
 def _acrux_bin() -> str:
-    return str(Path(__file__).parents[1].resolve() / ".venv" / "bin" / "acrux")
+    # __file__ = <repo>/acrux/app/main.py → parents[2] is the repo root.
+    return str(Path(__file__).parents[2].resolve() / ".venv" / "bin" / "acrux")
 
 
 def _workspace_safe_path(workspace: str, target: str) -> Path:
@@ -797,7 +799,7 @@ async def list_models() -> dict[str, Any]:
 
 @app.get("/api/acrux/status")
 async def acrux_status() -> dict[str, Any]:
-    pid_file = PidFile()
+    pid_file = PidFile(DAEMON_PID_FILE)
     degraded = is_degraded()
     usage = _storage_usage()
     status = {
@@ -839,6 +841,8 @@ async def acrux_start() -> dict[str, str]:
         return {"status": "started"}
     except subprocess.CalledProcessError as e:
         raise HTTPException(500, f"Failed to start acrux: {e.stderr or e.stdout}")
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        raise HTTPException(500, f"Failed to start acrux: {e}")
 
 
 @app.post("/api/acrux/stop")

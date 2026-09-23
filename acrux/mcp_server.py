@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -259,11 +260,11 @@ class AcruxMCPServer:
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         if name == "acrux_context":
-            from acrux.retrieval import Stores, recall_context
+            from acrux.retrieval import recall_context
 
             query = arguments.get("query", "")
             limit = arguments.get("limit", 8)
-            stores = Stores(semantic=semantic, episodic=episodic, procedural=procedural)
+            stores = SimpleNamespace(semantic=semantic, episodic=episodic, procedural=procedural)
             context = await recall_context(
                 stores,
                 lambda p: ProceduralDBStore(self.config.projects_dir / p / "skills.db")

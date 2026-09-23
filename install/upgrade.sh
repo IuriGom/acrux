@@ -20,7 +20,7 @@ set -eu
 PIA_HOME="${PIA_HOME:-$HOME/.pia}"
 PIA_HOME="${PIA_HOME:-$HOME/.acrux}"
 # TODO: point this at the real GitHub org/user before publishing releases.
-ACRUX_GH_REPO="${ACRUX_GH_REPO:-IuriGom/acrux}"
+ACRUX_GH_REPO="${ACRUX_GH_REPO:-acrux-project/acrux}"
 ACRUX_VERSION="${ACRUX_VERSION:-}"        # empty = resolve latest GitHub release
 CHANNEL="stable"                          # stable | main
 NO_SERVICE="${ACRUX_NO_SERVICE:-0}"       # 1 = never touch launchctl/systemctl

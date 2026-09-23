@@ -108,7 +108,10 @@ final class BackendProcess: ObservableObject {
     private func killProcessOnPort(_ port: Int) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        task.arguments = ["-ti", ":\(port)"]
+        // Only kill processes LISTENING on the port. Plain `lsof -ti :port`
+        // also matches outbound client connections (e.g. the acrux daemon
+        // talking to this backend) and would SIGTERM innocent processes.
+        task.arguments = ["-nP", "-tiTCP:\(port)", "-sTCP:LISTEN"]
         let pipe = Pipe()
         task.standardOutput = pipe
         try? task.run()

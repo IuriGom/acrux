@@ -16,6 +16,9 @@ import yaml
 
 
 PID_FILE = Path.home() / ".acrux" / "acrux.pid"
+# Separate pid file for the CLI daemon so it does not collide with the
+# Acrux.app backend, which tracks its own process in PID_FILE.
+DAEMON_PID_FILE = Path.home() / ".acrux" / "daemon.pid"
 
 _degraded = False
 _degraded_reason: str | None = None

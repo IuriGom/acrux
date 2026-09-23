@@ -108,11 +108,17 @@ class PluginManager:
         list means the verifier accepted the skill. A verifier that raises is
         reported as failed with the exception message instead of propagating.
         """
+        import asyncio
+        import inspect
+
         results: dict[str, list[str]] = {}
         for name, verifier in self.skill_verifiers.items():
             try:
                 if hasattr(verifier, "verify"):
-                    ok, errors = verifier.verify(skill)
+                    if inspect.iscoroutinefunction(verifier.verify):
+                        ok, errors = asyncio.run(verifier.verify(skill))
+                    else:
+                        ok, errors = verifier.verify(skill)
                 else:
                     ok, errors = verifier(skill)
             except Exception as exc:  # plugins must not crash the host

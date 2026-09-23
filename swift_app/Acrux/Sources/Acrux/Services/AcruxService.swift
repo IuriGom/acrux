@@ -111,7 +111,7 @@ final class AcruxService: ObservableObject {
     func fetchStatus() async {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/status") else { return }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             status = try decoder.decode(AcruxStatus.self, from: data)
             isConnected = true
             isBackendRunning = status?.running ?? false
@@ -125,7 +125,7 @@ final class AcruxService: ObservableObject {
     func fetchModels() async {
         guard let url = URL(string: "\(Constants.backendURL)/api/models") else { return }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             let response = try decoder.decode(ModelsResponse.self, from: data)
             models = response.models
                 .filter { !$0.name.lowercased().contains("embed") && !$0.name.lowercased().contains("bge") }
@@ -148,7 +148,7 @@ final class AcruxService: ObservableObject {
 
     func fetchKnowledgeSummary() async throws -> String {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/knowledge") else { throw URLError(.badURL) }
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
         let response = try decoder.decode(KnowledgeResponse.self, from: data)
         return response.summary
     }
@@ -183,7 +183,7 @@ final class AcruxService: ObservableObject {
         components.queryItems = queryItems
         guard let url = components.url else { return [] }
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
                 return []
             }
@@ -198,7 +198,7 @@ final class AcruxService: ObservableObject {
     func reverifyFacts() async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/reverify") else { return false }
         do {
-            var request = URLRequest(url: url)
+            var request = URLRequest.acrux(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -246,7 +246,7 @@ final class AcruxService: ObservableObject {
         }
         components.queryItems = queryItems
         guard let url = components.url else { throw URLError(.badURL) }
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
             throw URLError(.badServerResponse)
         }
@@ -261,7 +261,7 @@ final class AcruxService: ObservableObject {
 
     func deleteMemory(id: String, endpoint: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/memories/\(endpoint)/\(id)") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "DELETE"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -273,7 +273,7 @@ final class AcruxService: ObservableObject {
 
     func updateFact(id: String, content: String, tags: [String]) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/memories/facts/\(id)") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = FactUpdateRequest(content: content, tags: tags)
@@ -293,7 +293,7 @@ final class AcruxService: ObservableObject {
         components.queryItems = [URLQueryItem(name: "project", value: project)]
         guard let url = components.url else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode(FactTreeResponse.self, from: data).tree.asFactNode()
         } catch {
             return nil
@@ -304,7 +304,7 @@ final class AcruxService: ObservableObject {
         var components = URLComponents(string: "\(Constants.backendURL)/api/memories/facts/\(parentId)/children")!
         components.queryItems = [URLQueryItem(name: "project", value: project)]
         guard let url = components.url else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = FactUpdateRequest(content: content, tags: tags)
@@ -319,7 +319,7 @@ final class AcruxService: ObservableObject {
 
     func linkFacts(sourceId: String, targetId: String, relationType: String = "related") async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/memories/facts/\(sourceId)/link") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = LinkFactsRequest(targetId: targetId, relationType: relationType)
@@ -337,7 +337,7 @@ final class AcruxService: ObservableObject {
     func fetchFactVersions(id: String) async -> [FactVersion] {
         guard let url = URL(string: "\(Constants.backendURL)/api/memories/facts/\(id)/versions") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([FactVersion].self, from: data)
         } catch {
             return []
@@ -346,7 +346,7 @@ final class AcruxService: ObservableObject {
 
     func restoreFactVersion(factId: String, versionId: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/memories/facts/\(factId)/versions/\(versionId)/restore") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -360,7 +360,7 @@ final class AcruxService: ObservableObject {
 
     func triggerClustering(project: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/cluster") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = ["project": project]
@@ -378,7 +378,7 @@ final class AcruxService: ObservableObject {
         components.queryItems = [URLQueryItem(name: "project", value: project)]
         guard let url = components.url else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([Cluster].self, from: data)
         } catch {
             return []
@@ -390,7 +390,7 @@ final class AcruxService: ObservableObject {
     func fetchInheritance(project: String) async -> [InheritanceLayer] {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/inheritance") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([InheritanceLayer].self, from: data)
         } catch {
             return []
@@ -399,7 +399,7 @@ final class AcruxService: ObservableObject {
 
     func addInheritance(project: String, baseProject: String, layerOrder: Int = 0) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/inheritance") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = AddInheritanceRequest(baseProject: baseProject, layerOrder: layerOrder)
@@ -414,7 +414,7 @@ final class AcruxService: ObservableObject {
 
     func removeInheritance(project: String, baseProject: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/inheritance/\(baseProject.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? baseProject)") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "DELETE"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -427,7 +427,7 @@ final class AcruxService: ObservableObject {
     func fetchEffectiveFacts(project: String) async -> [MemoryItem] {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/effective-facts") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([MemoryItem].self, from: data)
         } catch {
             return []
@@ -448,7 +448,7 @@ final class AcruxService: ObservableObject {
         components.queryItems = queryItems
         guard let url = components.url else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([TimelineEvent].self, from: data)
         } catch {
             return []
@@ -459,7 +459,7 @@ final class AcruxService: ObservableObject {
 
     func recomputeDecay() async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/decay") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -477,7 +477,7 @@ final class AcruxService: ObservableObject {
         ]
         guard let url = components.url else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([DecayFact].self, from: data)
         } catch {
             return []
@@ -490,7 +490,7 @@ final class AcruxService: ObservableObject {
         if project.isEmpty { return [] }
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/tests") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([TestResult].self, from: data)
         } catch {
             return []
@@ -499,7 +499,7 @@ final class AcruxService: ObservableObject {
 
     func recordTestResult(_ test: RecordTestRequest, project: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/tests") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONEncoder().encode(test)
@@ -525,7 +525,7 @@ final class AcruxService: ObservableObject {
         if !queryItems.isEmpty { components.queryItems = queryItems }
         guard let url = components.url else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([Dependency].self, from: data)
         } catch {
             return []
@@ -534,7 +534,7 @@ final class AcruxService: ObservableObject {
 
     func ingestDependencies(project: String, dependencies: [DependencyInput]) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/dependencies") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = IngestDependenciesRequest(dependencies: dependencies)
@@ -556,7 +556,7 @@ final class AcruxService: ObservableObject {
         }
         guard let url = components.url else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([CodeReview].self, from: data)
         } catch {
             return []
@@ -565,7 +565,7 @@ final class AcruxService: ObservableObject {
 
     func addReview(project: String, request: AddReviewRequest) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/reviews") else { return false }
-        var urlRequest = URLRequest(url: url)
+        var urlRequest = URLRequest.acrux(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try? encoder.encode(request)
@@ -582,7 +582,7 @@ final class AcruxService: ObservableObject {
     func fetchFileSummaries(project: String) async -> [FileSummary] {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/file-summaries") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([FileSummary].self, from: data)
         } catch {
             return []
@@ -591,7 +591,7 @@ final class AcruxService: ObservableObject {
 
     func summarizeFile(project: String, path: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/file-summaries") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = SummarizeFileRequest(path: path)
@@ -608,7 +608,7 @@ final class AcruxService: ObservableObject {
 
     func importNotion(path: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/import/notion") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["path": path])
@@ -622,7 +622,7 @@ final class AcruxService: ObservableObject {
 
     func importObsidian(path: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/import/obsidian") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["path": path])
@@ -642,7 +642,7 @@ final class AcruxService: ObservableObject {
         ]
         guard let url = components.url else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return data
         } catch {
             return nil
@@ -653,7 +653,7 @@ final class AcruxService: ObservableObject {
 
     func setWatcher(project: String, running: Bool) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/watcher/\(running ? "start" : "stop")") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -666,7 +666,7 @@ final class AcruxService: ObservableObject {
     func fetchWatcherStatus(project: String) async -> WatcherStatus? {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/watcher/status") else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode(WatcherStatus.self, from: data)
         } catch {
             return nil
@@ -678,7 +678,7 @@ final class AcruxService: ObservableObject {
     func fetchHealthChecks() async -> [HealthCheck] {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/health") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             let wrapper = try decoder.decode(HealthCheckResponse.self, from: data)
             return wrapper.checks
         } catch {
@@ -688,7 +688,7 @@ final class AcruxService: ObservableObject {
 
     func runHealthChecks() async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/health/run") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -703,7 +703,7 @@ final class AcruxService: ObservableObject {
     func fetchChecksums() async -> [ChecksumStatus] {
         guard let url = URL(string: "\(Constants.backendURL)/api/acrux/checksums") else { return [] }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode([ChecksumStatus].self, from: data)
         } catch {
             return []
@@ -719,7 +719,7 @@ final class AcruxService: ObservableObject {
         }
         guard let url = components.url else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode(RollbackSuggestion.self, from: data)
         } catch {
             return nil
@@ -730,7 +730,7 @@ final class AcruxService: ObservableObject {
 
     func startReplay(sessionId: String, workspace: String? = nil, force: Bool = false, autoApprove: Bool = false) async -> ReplayStatus? {
         guard let url = URL(string: "\(Constants.backendURL)/api/episodes/\(sessionId)/replay") else { return nil }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = ReplayStartRequest(workspace: workspace, force: force, autoApprove: autoApprove)
@@ -747,7 +747,7 @@ final class AcruxService: ObservableObject {
     func fetchReplayStatus(sessionId: String) async -> ReplayStatus? {
         guard let url = URL(string: "\(Constants.backendURL)/api/episodes/\(sessionId)/replay/status") else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode(ReplayStatus.self, from: data)
         } catch {
             return nil
@@ -756,7 +756,7 @@ final class AcruxService: ObservableObject {
 
     func stepReplay(sessionId: String, autoApprove: Bool? = nil) async -> ReplayStatus? {
         guard let url = URL(string: "\(Constants.backendURL)/api/episodes/\(sessionId)/replay/step") else { return nil }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = ReplayStepRequest(autoApprove: autoApprove)
@@ -772,7 +772,7 @@ final class AcruxService: ObservableObject {
 
     func abortReplay(sessionId: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/episodes/\(sessionId)/replay/abort") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -784,7 +784,7 @@ final class AcruxService: ObservableObject {
 
     func restoreReplayCommit(sessionId: String) async -> ReplayStatus? {
         guard let url = URL(string: "\(Constants.backendURL)/api/episodes/\(sessionId)/replay/restore") else { return nil }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -805,7 +805,7 @@ final class AcruxService: ObservableObject {
             urlString = "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/graph?max_nodes=\(maxNodes)"
         }
         guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
         let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
         let headers = (response as? HTTPURLResponse)?.allHeaderFields as? [String: Any] ?? [:]
         if statusCode >= 400 {
@@ -838,7 +838,7 @@ final class AcruxService: ObservableObject {
     func fetchSystemPrompt(project: String) async -> SystemPrompt? {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/system-prompt") else { return nil }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            let (data, _) = try await URLSession.shared.data(for: URLRequest.acrux(url: url))
             return try decoder.decode(SystemPrompt.self, from: data)
         } catch {
             return nil
@@ -847,7 +847,7 @@ final class AcruxService: ObservableObject {
 
     func updateSystemPrompt(project: String, promptText: String) async -> Bool {
         guard let url = URL(string: "\(Constants.backendURL)/api/projects/\(project.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? project)/system-prompt") else { return false }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body = UpdateSystemPromptRequest(promptText: promptText)
@@ -864,7 +864,7 @@ final class AcruxService: ObservableObject {
 
     func suggestSkills(for message: String) async -> [SkillSuggestion] {
         guard let url = URL(string: "\(Constants.backendURL)/api/skills/suggest") else { return [] }
-        var request = URLRequest(url: url)
+        var request = URLRequest.acrux(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let payload = ["message": message]
@@ -885,7 +885,7 @@ final class AcruxService: ObservableObject {
         if let existing = sessions[chat.id] {
             if existing.task?.state != .running {
                 existing.task?.cancel()
-                guard let url = URL(string: "\(Constants.wsURL)/ws/chat/\(chat.id.uuidString)") else { return }
+                guard let url = URL(string: "\(Constants.wsURL)/ws/chat/\(chat.id.uuidString)\(AcruxAuth.tokenQuery)") else { return }
                 existing.task = URLSession.shared.webSocketTask(with: url)
                 existing.task?.resume()
                 receive(for: existing)
@@ -894,7 +894,7 @@ final class AcruxService: ObservableObject {
         }
         let session = ChatSession(chat: chat)
         sessions[chat.id] = session
-        guard let url = URL(string: "\(Constants.wsURL)/ws/chat/\(chat.id.uuidString)") else { return }
+        guard let url = URL(string: "\(Constants.wsURL)/ws/chat/\(chat.id.uuidString)\(AcruxAuth.tokenQuery)") else { return }
         session.task = URLSession.shared.webSocketTask(with: url)
         session.task?.resume()
         receive(for: session)

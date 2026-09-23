@@ -24,7 +24,7 @@ class SkillVerifier:
         self.episodic = episodic
         self.procedural = procedural
 
-    def verify(self, skill: Skill) -> tuple[bool, list[str]]:
+    async def verify(self, skill: Skill) -> tuple[bool, list[str]]:
         errors: list[str] = []
 
         if not skill.name.strip():
@@ -70,10 +70,10 @@ class SkillVerifier:
 
         # Executable replay/negative checks for skills that look like shell scripts.
         if self._is_executable_skill(skill):
-            ok, err = self.replay_execute(skill)
+            ok, err = await self.replay_execute(skill)
             if not ok:
                 errors.append(f"replay execute failed: {err}")
-            ok, err = self.negative_execute(skill)
+            ok, err = await self.negative_execute(skill)
             if not ok:
                 errors.append(f"negative execute failed: {err}")
 
@@ -120,7 +120,7 @@ class SkillVerifier:
         shell_markers = ("git ", "cd ", "npm ", "pytest", "cargo ", "make ", "bash ", "sh ", "./", "echo ", "cat ", "ls ", "grep ", "sed ", "awk ", "python ", "pip ", "docker ")
         return any(marker in text for marker in shell_markers)
 
-    def replay_execute(self, skill: Skill) -> tuple[bool, str]:
+    async def replay_execute(self, skill: Skill) -> tuple[bool, str]:
         """Replay the skill at its evidence git commit in a temp worktree."""
         commits = []
         for ev in skill.evidence:
@@ -149,9 +149,7 @@ class SkillVerifier:
             except Exception as exc:
                 return True, f"could not create worktree (skipped): {exc}"
             try:
-                exit_code, output = __import__("asyncio").run(
-                    run_sandboxed(script, str(worktree), timeout=120)
-                )
+                exit_code, output = await run_sandboxed(script, str(worktree), timeout=120)
                 if exit_code != 0:
                     return False, f"replay failed at {commit}: {output[:200]}"
                 return True, "replay passed"
@@ -162,13 +160,11 @@ class SkillVerifier:
                     timeout=10,
                 )
 
-    def negative_execute(self, skill: Skill) -> tuple[bool, str]:
+    async def negative_execute(self, skill: Skill) -> tuple[bool, str]:
         """Run the skill where preconditions don't hold; require graceful failure."""
         script = "\n".join(skill.procedure)
         with tempfile.TemporaryDirectory(prefix="acrux-negative-") as tmpdir:
-            exit_code, output = __import__("asyncio").run(
-                run_sandboxed(script, tmpdir, timeout=60)
-            )
+            exit_code, output = await run_sandboxed(script, tmpdir, timeout=60)
             # Expect non-zero exit or explicit failure; success is suspicious.
             if exit_code == 0:
                 return False, "skill succeeded in an empty workspace (should have failed)"
@@ -188,10 +184,10 @@ class SkillVerifier:
         except Exception as exc:
             return False, f"ab_check failed: {exc}"
 
-    def verify_project(self, project: str) -> dict[str, list[str]]:
+    async def verify_project(self, project: str) -> dict[str, list[str]]:
         results: dict[str, list[str]] = {}
         for skill in self.procedural.get_all(project):
-            ok, errors = self.verify(skill)
+            ok, errors = await self.verify(skill)
             if ok and not skill.verified:
                 skill.verified = True
                 self.procedural.update(skill)
