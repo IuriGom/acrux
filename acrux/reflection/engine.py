@@ -82,14 +82,15 @@ class ReflectionEngine:
             skills = await self.provider.extract_kimi_skills(corrected, facts)
             validated = 0
             for skill in skills:
-                skill.project = project
-                skill.tags = list(set(skill.tags + ["correction"]))
-                ok, errors = await verifier.verify(skill)
-                if ok:
-                    self.procedural.add_pending(skill)
-                    validated += 1
-                else:
-                    self._log_skill_rejected(project, skill, errors)
+                validated += await self._validate_skill(
+                    skill,
+                    project,
+                    verifier,
+                    lambda fb, c=corrected, f=facts: self.provider.extract_kimi_skills(
+                        c, f, feedback=fb
+                    ),
+                    extra_tags=["correction"],
+                )
             total_skills += validated
             if facts or validated:
                 self.episodic.mark_compacted([e.session_id for e in corrected])
@@ -107,13 +108,14 @@ class ReflectionEngine:
                 skills = await self.provider.extract_kimi_skills(cluster, facts)
                 validated = 0
                 for skill in skills:
-                    skill.project = project
-                    ok, errors = await verifier.verify(skill)
-                    if ok:
-                        self.procedural.add_pending(skill)
-                        validated += 1
-                    else:
-                        self._log_skill_rejected(project, skill, errors)
+                    validated += await self._validate_skill(
+                        skill,
+                        project,
+                        verifier,
+                        lambda fb, c=cluster, f=facts: self.provider.extract_kimi_skills(
+                            c, f, feedback=fb
+                        ),
+                    )
                 total_skills += validated
 
                 if facts or validated:
@@ -129,19 +131,49 @@ class ReflectionEngine:
                 skills = await self.provider.extract_skills(cluster, facts)
                 validated = 0
                 for skill in skills:
-                    skill.project = project
-                    ok, errors = await verifier.verify(skill)
-                    if ok:
-                        self.procedural.add_pending(skill)
-                        validated += 1
-                    else:
-                        self._log_skill_rejected(project, skill, errors)
+                    validated += await self._validate_skill(
+                        skill,
+                        project,
+                        verifier,
+                        lambda fb, c=cluster, f=facts: self.provider.extract_skills(
+                            c, f, feedback=fb
+                        ),
+                    )
                 total_skills += validated
 
                 if facts or validated:
                     self.episodic.mark_compacted([e.session_id for e in cluster])
 
         return {"facts": total_facts, "skills": total_skills}
+
+    async def _validate_skill(
+        self,
+        skill,
+        project: str,
+        verifier,
+        retry_extract,
+        extra_tags: list[str] | None = None,
+    ) -> int:
+        """Verify a generated skill; on rejection, retry once with the errors as feedback."""
+        skill.project = project
+        if extra_tags:
+            skill.tags = list(set(skill.tags + extra_tags))
+        ok, errors = await verifier.verify(skill)
+        if ok:
+            self.procedural.add_pending(skill)
+            return 1
+        if retry_extract is not None:
+            retried = await retry_extract("; ".join(errors))
+            for candidate in retried:
+                candidate.project = project
+                if extra_tags:
+                    candidate.tags = list(set(candidate.tags + extra_tags))
+                ok, _ = await verifier.verify(candidate)
+                if ok:
+                    self.procedural.add_pending(candidate)
+                    return 1
+        self._log_skill_rejected(project, skill, errors)
+        return 0
 
     async def _cluster_episodes(self, episodes: list[Episode]) -> list[list[Episode]]:
         """Cluster episodes by embedding similarity; fall back to tags."""

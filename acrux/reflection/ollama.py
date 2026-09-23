@@ -30,14 +30,14 @@ class OllamaProvider(ReflectionProvider):
         return []
 
     async def extract_skills(
-        self, episodes: list[Episode], facts: list[Fact], retries: int = 2
+        self, episodes: list[Episode], facts: list[Fact], retries: int = 2, feedback: str | None = None
     ) -> list[Skill]:
         if not episodes:
             return []
 
         project = episodes[0].project
         for attempt in range(retries + 1):
-            prompt = self.build_skill_prompt(episodes, facts)
+            prompt = self.build_skill_prompt(episodes, facts, feedback=feedback)
             response = await self._generate(prompt)
             skill = self._parse_skill_json(response, project, episodes)
             if skill:
@@ -58,14 +58,14 @@ class OllamaProvider(ReflectionProvider):
         return []
 
     async def extract_kimi_skills(
-        self, episodes: list[Episode], facts: list[Fact], retries: int = 2
+        self, episodes: list[Episode], facts: list[Fact], retries: int = 2, feedback: str | None = None
     ) -> list[Skill]:
         if not episodes:
             return []
 
         project = episodes[0].project
         for attempt in range(retries + 1):
-            prompt = self.build_kimi_skill_prompt(episodes, facts)
+            prompt = self.build_kimi_skill_prompt(episodes, facts, feedback=feedback)
             response = await self._generate(prompt, temperature=0.15)
             skill = self._parse_skill_json(response, project, episodes)
             if skill:

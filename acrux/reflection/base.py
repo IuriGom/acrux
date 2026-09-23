@@ -14,8 +14,10 @@ class ReflectionProvider(ABC):
         ...
 
     @abstractmethod
-    async def extract_skills(self, episodes: list[Episode], facts: list[Fact]) -> list[Skill]:
-        """Extract reusable skills from episodes and facts."""
+    async def extract_skills(
+        self, episodes: list[Episode], facts: list[Fact], feedback: str | None = None
+    ) -> list[Skill]:
+        """Extract reusable skills from episodes and facts, with optional rejection feedback."""
         ...
 
     def build_reflection_prompt(self, episodes: list[Episode]) -> str:
@@ -51,7 +53,7 @@ class ReflectionProvider(ABC):
             f"{text}\n\nUseful facts JSON:"
         )
 
-    def build_kimi_skill_prompt(self, episodes: list[Episode], facts: list[Fact]) -> str:
+    def build_kimi_skill_prompt(self, episodes: list[Episode], facts: list[Fact], feedback: str | None = None) -> str:
         ep_text = "\n\n".join(
             f"Task: {e.task}\nOutcome: {e.outcome}\nRoot cause: {e.root_cause}\nFix: {e.fix_pattern}"
             for e in episodes
@@ -64,7 +66,21 @@ class ReflectionProvider(ABC):
             "A skill has: a name, preconditions (when to apply), and a procedure (steps). "
             "Return only valid JSON in this exact format:\n"
             '{"name": "...", "preconditions": ["..."], "procedure": ["..."], "evidence": [{"session_id": "..."}]}\n\n'
+            f"{self._feedback_block(feedback)}"
             f"Traces:\n{ep_text}\n\nFacts:\n{fact_text}\n\nSkill JSON:"
+        )
+
+    @staticmethod
+    def _feedback_block(feedback: str | None) -> str:
+        if not feedback:
+            return ""
+        return (
+            "IMPORTANT: A previous attempt at this skill was rejected by validation with "
+            f"these errors: {feedback}. Regenerate the skill fixing every listed issue: "
+            "ground each precondition in the episode context, write a fully enumerated "
+            "step-by-step procedure with no placeholders (at least 2 steps), cite only "
+            "real evidence session ids, and only claim skills whose evidence episodes "
+            "succeeded.\n\n"
         )
 
     @staticmethod
@@ -73,7 +89,7 @@ class ReflectionProvider(ABC):
             f"{a.tool}: {a.command or a.target}" for a in actions if a.command or a.target
         )
 
-    def build_skill_prompt(self, episodes: list[Episode], facts: list[Fact]) -> str:
+    def build_skill_prompt(self, episodes: list[Episode], facts: list[Fact], feedback: str | None = None) -> str:
         ep_text = "\n\n".join(
             f"Task: {e.task}\nOutcome: {e.outcome}\nRoot cause: {e.root_cause}\nFix: {e.fix_pattern}"
             for e in episodes
@@ -86,5 +102,6 @@ class ReflectionProvider(ABC):
             "A skill has: a name, preconditions (when to apply), and a procedure (steps). "
             "Return only valid JSON in this exact format:\n"
             '{"name": "...", "preconditions": ["..."], "procedure": ["..."], "evidence": [{"session_id": "..."}]}\n\n'
+            f"{self._feedback_block(feedback)}"
             f"Traces:\n{ep_text}\n\nFacts:\n{fact_text}\n\nSkill JSON:"
         )
