@@ -164,8 +164,8 @@ def daemon(
 ) -> None:
     """Run acrux as a long-running daemon with MCP server + scheduled reflection."""
     cfg = ctx.obj["config"]
-    transport = mcp_transport or cfg.mcp.transport
-    port = port or cfg.mcp.port
+    transport = mcp_transport or os.environ.get("BRAIN_MCP_TRANSPORT") or cfg.mcp.transport
+    port = port or int(os.environ.get("BRAIN_MCP_PORT") or 0) or cfg.mcp.port
 
     if background:
         pid_file = PidFile(DAEMON_PID_FILE)
@@ -189,6 +189,8 @@ def daemon(
 
     from acrux.daemon import run_daemon
 
+    cfg.mcp.transport = transport  # type: ignore[assignment]
+    cfg.mcp.port = port
     asyncio.run(run_daemon(cfg))
 
 

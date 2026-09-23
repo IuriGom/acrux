@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,7 +17,7 @@ from acrux.memory.episodic import EpisodicStore
 from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.memory.semantic import SemanticStore
 from acrux.reflection.engine import ReflectionEngine
-from acrux.utils import get_logger, setup_logging, utcnow
+from acrux.utils import DAEMON_PID_FILE, PidFile, get_logger, setup_logging, utcnow
 
 if TYPE_CHECKING:
     pass
@@ -35,6 +36,8 @@ class AcruxDaemon:
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, self._request_stop)
 
+        pid_file = PidFile(DAEMON_PID_FILE)
+        pid_file.write(os.getpid())
         self.logger.info("Starting acrux daemon (transport=%s)", self.config.mcp.transport)
         server_task = asyncio.create_task(self._run_server())
         scheduler_task = asyncio.create_task(self._run_scheduler())
@@ -56,6 +59,7 @@ class AcruxDaemon:
                     await task
                 except asyncio.CancelledError:
                     pass
+            pid_file.clear()
             self.logger.info("Acrux daemon stopped.")
 
     def _request_stop(self) -> None:
