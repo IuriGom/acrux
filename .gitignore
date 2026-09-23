@@ -11,6 +11,9 @@ __pycache__/
 .acrux/
 .brain/
 
+# Agent session artifacts
+.superpowers/
+
 # Swift
 swift_app/Acrux/.build/
 .swiftpm/
