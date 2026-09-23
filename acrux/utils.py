@@ -8,11 +8,17 @@ import signal
 import sqlite3
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
 import yaml
+
+
+def utcnow() -> datetime:
+    """Naive UTC timestamp, replacing the deprecated datetime.utcnow()."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 PID_FILE = Path.home() / ".acrux" / "acrux.pid"

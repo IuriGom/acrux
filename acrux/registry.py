@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from acrux.utils import utcnow
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
@@ -124,7 +126,7 @@ def export_package(
         "version": 1,
         "name": name or path.stem,
         "description": description,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": utcnow().isoformat(),
         "skills": [s.to_dict() for s in skills],
     }
     private_key = _ed25519_private_key()

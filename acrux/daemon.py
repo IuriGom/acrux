@@ -16,7 +16,7 @@ from acrux.memory.episodic import EpisodicStore
 from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.memory.semantic import SemanticStore
 from acrux.reflection.engine import ReflectionEngine
-from acrux.utils import get_logger, setup_logging
+from acrux.utils import get_logger, setup_logging, utcnow
 
 if TYPE_CHECKING:
     pass
@@ -80,7 +80,7 @@ class AcruxDaemon:
 
         while not self.stop_event.is_set():
             next_run = self._next_run_time()
-            wait_seconds = (next_run - datetime.utcnow()).total_seconds()
+            wait_seconds = (next_run - utcnow()).total_seconds()
             # Wake periodically to check adaptive threshold (at least every 5 minutes).
             check_seconds = min(max(wait_seconds, 0), 300)
             if check_seconds > 0:
@@ -92,7 +92,7 @@ class AcruxDaemon:
             if self.stop_event.is_set():
                 break
 
-            cron_due = datetime.utcnow() >= next_run
+            cron_due = utcnow() >= next_run
             threshold_triggered = self._check_adaptive_threshold()
             if cron_due or threshold_triggered:
                 await self._run_reflection()
@@ -113,7 +113,7 @@ class AcruxDaemon:
 
     def _next_run_time(self) -> datetime:
         try:
-            itr = croniter(self.config.reflection.schedule, datetime.utcnow())
+            itr = croniter(self.config.reflection.schedule, utcnow())
             return itr.get_next(datetime)
         except Exception as exc:
             self.logger.warning(
@@ -121,7 +121,7 @@ class AcruxDaemon:
                 self.config.reflection.schedule,
                 exc,
             )
-            itr = croniter("0 2 * * *", datetime.utcnow())
+            itr = croniter("0 2 * * *", utcnow())
             return itr.get_next(datetime)
 
     async def _run_reflection(self) -> None:

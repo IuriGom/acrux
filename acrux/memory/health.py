@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from acrux.utils import utcnow
+
 
 class HealthStoreMixin:
     """Health checks and storage-integrity checksums.
@@ -32,7 +34,7 @@ class HealthStoreMixin:
                     check.get("check_type"),
                     check.get("severity"),
                     check.get("message"),
-                    datetime.utcnow().isoformat(),
+                    utcnow().isoformat(),
                     check.get("resolved_at"),
                 ),
             )
@@ -71,7 +73,7 @@ class HealthStoreMixin:
         self, project: str | None = None, check_type: str | None = None
     ) -> int:
         base = "UPDATE health_checks SET resolved_at = ? WHERE resolved_at IS NULL"
-        params: list[Any] = [datetime.utcnow().isoformat()]
+        params: list[Any] = [utcnow().isoformat()]
         if project is not None:
             base += " AND project = ?"
             params.append(project)
@@ -94,7 +96,7 @@ class HealthStoreMixin:
                 INSERT OR REPLACE INTO storage_checksums (file_path, checksum, checked_at)
                 VALUES (?, ?, ?)
                 """,
-                (file_path, checksum, datetime.utcnow().isoformat()),
+                (file_path, checksum, utcnow().isoformat()),
             )
             conn.commit()
 

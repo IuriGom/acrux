@@ -12,6 +12,8 @@ from typing import Any
 
 from acrux.models import Fact
 
+from acrux.utils import utcnow
+
 
 class GraphStoreMixin:
     """Fact relationships, hierarchy trees, clustering, project inheritance layers.
@@ -162,7 +164,7 @@ class GraphStoreMixin:
             centroids = new_centroids
 
         # Persist clusters
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         with self._connect() as conn:
             conn.execute("DELETE FROM clusters WHERE project = ?", (project,))
             cluster_id_map: dict[int, int] = {}
@@ -220,7 +222,7 @@ class GraphStoreMixin:
         for idx in range(n):
             groups[find(idx)].append(idx)
 
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         with self._connect() as conn:
             conn.execute("DELETE FROM clusters WHERE project = ?", (project,))
             cluster_count = 0

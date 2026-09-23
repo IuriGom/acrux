@@ -11,6 +11,8 @@ from acrux.config import AcruxConfig
 from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.memory.semantic import SemanticStore
 
+from acrux.utils import utcnow
+
 
 async def run_benchmark(
     cfg: AcruxConfig, project: str | None = None, k: int = 10, limit: int = 50
@@ -29,7 +31,7 @@ async def run_benchmark(
         ]
 
     report: dict[str, Any] = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow().isoformat(),
         "k": k,
         "limit": limit,
         "projects": {},

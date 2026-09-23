@@ -9,6 +9,8 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+from acrux.utils import utcnow
+
 
 class ArtifactsStoreMixin:
     """Test results, code reviews, dependencies, file summaries, watcher state.
@@ -22,7 +24,7 @@ class ArtifactsStoreMixin:
     # ------------------------------------------------------------------
 
     def add_dependencies(self, project: str, deps: list[dict[str, Any]]) -> int:
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         with self._connect() as conn:
             for dep in deps:
                 conn.execute(
@@ -92,7 +94,7 @@ class ArtifactsStoreMixin:
                     review.get("comment"),
                     review.get("resolution", "pending"),
                     review.get("reviewer", "user"),
-                    datetime.utcnow().isoformat(),
+                    utcnow().isoformat(),
                 ),
             )
             conn.commit()
@@ -149,7 +151,7 @@ class ArtifactsStoreMixin:
                     result.get("output", ""),
                     result.get("duration_ms", 0),
                     result.get("root_cause"),
-                    result.get("run_at") or datetime.utcnow().isoformat(),
+                    result.get("run_at") or utcnow().isoformat(),
                 ),
             )
             conn.commit()
@@ -195,7 +197,7 @@ class ArtifactsStoreMixin:
                     summary.get("summary"),
                     summary.get("content_hash"),
                     summary.get("last_modified"),
-                    datetime.utcnow().isoformat(),
+                    utcnow().isoformat(),
                 ),
             )
             conn.commit()
@@ -256,7 +258,7 @@ class ArtifactsStoreMixin:
         with self._connect() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO chat_pins (chat_id, message_id, created_at) VALUES (?, ?, ?)",
-                (chat_id, message_id, datetime.utcnow().isoformat()),
+                (chat_id, message_id, utcnow().isoformat()),
             )
             conn.commit()
 
@@ -289,7 +291,7 @@ class ArtifactsStoreMixin:
                 INSERT OR REPLACE INTO project_system_prompts (project, prompt_text, updated_at)
                 VALUES (?, ?, ?)
                 """,
-                (project, prompt_text, datetime.utcnow().isoformat()),
+                (project, prompt_text, utcnow().isoformat()),
             )
             conn.commit()
 

@@ -11,6 +11,8 @@ from typing import Any
 
 from acrux.models import Action, Episode
 
+from acrux.utils import utcnow
+
 
 class EpisodicStore:
     def __init__(self, db_path: Path):
@@ -277,7 +279,7 @@ class EpisodicStore:
         return [self._row_to_episode(row) for row in rows]
 
     def get_old(self, project: str, days: int) -> list[Episode]:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (utcnow() - timedelta(days=days)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -328,7 +330,7 @@ class EpisodicStore:
         return row[0] if row else 0
 
     def prune_old(self, days: int) -> int:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (utcnow() - timedelta(days=days)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("DELETE FROM episodes WHERE timestamp < ?", (cutoff,))
             conn.commit()
@@ -355,7 +357,7 @@ class EpisodicStore:
             root_cause=row["root_cause"] or "",
             fix_pattern=row["fix_pattern"] or "",
             tags=json.loads(row["tags"] or "[]"),
-            timestamp=row["timestamp"] or datetime.utcnow().isoformat(),
+            timestamp=row["timestamp"] or utcnow().isoformat(),
             corrected=bool(row["corrected"]),
             compacted=bool(row["compacted"]),
             source=row["source"] or "",

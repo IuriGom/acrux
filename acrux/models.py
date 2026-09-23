@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+
+from acrux.utils import utcnow
 from typing import Any
 from uuid import uuid4
 
@@ -47,7 +49,7 @@ class Episode:
     root_cause: str = ""
     fix_pattern: str = ""
     tags: list[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: utcnow().isoformat())
     corrected: bool = False
     compacted: bool = False
     source: str = ""
@@ -83,7 +85,7 @@ class Episode:
             root_cause=data.get("root_cause", ""),
             fix_pattern=data.get("fix_pattern", ""),
             tags=data.get("tags", []),
-            timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=data.get("timestamp", utcnow().isoformat()),
             corrected=data.get("corrected", False),
             compacted=data.get("compacted", False),
             source=data.get("source", ""),
@@ -97,7 +99,7 @@ class Fact:
     content: str
     source: str = ""
     tags: list[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: utcnow().isoformat())
     id: int | None = None
     confidence: float = 0.0
     verified_count: int = 0
@@ -148,7 +150,7 @@ class Fact:
             content=data.get("content", ""),
             source=data.get("source", ""),
             tags=data.get("tags", []),
-            timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=data.get("timestamp", utcnow().isoformat()),
             id=data.get("id"),
             confidence=data.get("confidence", 0.0),
             verified_count=data.get("verified_count", 0),
@@ -202,7 +204,7 @@ class Skill:
     success_rate: float = 0.0
     verified: bool = False
     tags: list[str] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: utcnow().isoformat())
     # Extended capability fields
     parameters: dict[str, str] = field(default_factory=dict)  # e.g. {"test_command": "pytest tests/"}
     composition: list[str] = field(default_factory=list)  # skill IDs this skill calls
@@ -241,7 +243,7 @@ class Skill:
             success_rate=data.get("success_rate", 0.0),
             verified=data.get("verified", False),
             tags=data.get("tags", []),
-            timestamp=data.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=data.get("timestamp", utcnow().isoformat()),
             parameters=data.get("parameters", {}),
             composition=data.get("composition", []),
             precondition_checks=data.get("precondition_checks", []),

@@ -48,7 +48,7 @@ from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.memory.semantic import SemanticStore
 from acrux.models import Action, Episode, Fact
 from acrux.sandbox import run_sandboxed
-from acrux.utils import DAEMON_PID_FILE, PidFile, available_ram_mb, degraded_reason, git_context, is_degraded
+from acrux.utils import DAEMON_PID_FILE, PidFile, available_ram_mb, degraded_reason, git_context, is_degraded, utcnow
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 APP_DIR = Path.home() / ".acrux" / "app"
@@ -1037,7 +1037,7 @@ async def delete_chat(chat_id: str) -> dict[str, str]:
 def _save_chat(
     chat_id: str, title: str, messages: list[dict[str, Any]], meta: dict[str, Any]
 ) -> None:
-    now = datetime.utcnow().isoformat()
+    now = utcnow().isoformat()
     path = _chat_path(chat_id)
     data = {
         "id": chat_id,
@@ -1972,7 +1972,7 @@ async def _run_generation(
         {
             "role": "user",
             "content": user_text,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow().isoformat(),
         }
     )
     if not title or title == "New task":
@@ -2007,7 +2007,7 @@ async def _run_generation(
                     {
                         "role": "assistant",
                         "content": confirmation,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": utcnow().isoformat(),
                     }
                 )
                 await websocket.send_json({"type": "done"})
@@ -2296,7 +2296,7 @@ async def _run_generation(
                     "role": "assistant",
                     "content": final_content,
                     "reasoning": reasoning,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": utcnow().isoformat(),
                 }
             )
             _record_memory_outcomes(project, memory_context, success=True)
@@ -2425,7 +2425,7 @@ async def _run_generation(
                 "reasoning": reasoning,
                 "tool_calls": tool_calls_data,
                 "tool_results": tool_results_data,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": utcnow().isoformat(),
             }
         )
         _save_chat(chat_id, title, messages, meta)
@@ -2457,7 +2457,7 @@ async def _run_generation(
                 "role": "assistant",
                 "content": final_content,
                 "reasoning": reasoning,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": utcnow().isoformat(),
             }
         )
         await websocket.send_json({"type": "stopped"})
@@ -2658,7 +2658,7 @@ async def verify_skill(
             "success": success,
             "output": output,
             "elapsed": elapsed,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utcnow().isoformat(),
         }
     )
     total = len(skill.evidence)

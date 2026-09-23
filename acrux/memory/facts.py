@@ -8,6 +8,8 @@ import math
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
+
+from acrux.utils import utcnow
 from typing import Any
 
 from acrux.models import Fact
@@ -166,7 +168,7 @@ class FactStoreMixin:
             # Snapshot current version before overwriting
             self._create_version(existing, "user")
             existing.content = content
-            existing.timestamp = datetime.utcnow().isoformat()
+            existing.timestamp = utcnow().isoformat()
             existing.checksum = self._fact_checksum(existing)
             changed = True
             if self.embedder:
@@ -244,7 +246,7 @@ class FactStoreMixin:
                     fact.id,
                     fact.content,
                     json.dumps(fact.tags),
-                    fact.timestamp or datetime.utcnow().isoformat(),
+                    fact.timestamp or utcnow().isoformat(),
                     edited_by,
                 ),
             )
@@ -284,7 +286,7 @@ class FactStoreMixin:
         self._create_version(existing, "restore")
         existing.content = row["content"]
         existing.tags = json.loads(row["tags"] or "[]")
-        existing.timestamp = datetime.utcnow().isoformat()
+        existing.timestamp = utcnow().isoformat()
         existing.checksum = self._fact_checksum(existing)
         return await self.update_fact(fact_id)
 
@@ -377,7 +379,7 @@ class FactStoreMixin:
         if not fact_ids:
             return
         placeholders = ", ".join("?" for _ in fact_ids)
-        now = datetime.utcnow().isoformat()
+        now = utcnow().isoformat()
         with self._connect() as conn:
             conn.execute(
                 f"UPDATE facts SET recall_count = recall_count + 1, last_recalled_at = ? WHERE id IN ({placeholders})",
@@ -389,8 +391,8 @@ class FactStoreMixin:
         try:
             ts = datetime.fromisoformat(timestamp)
         except Exception:
-            ts = datetime.utcnow()
-        days_old = max(0, (datetime.utcnow() - ts).total_seconds() / 86400)
+            ts = utcnow()
+        days_old = max(0, (utcnow() - ts).total_seconds() / 86400)
         return math.exp(-days_old / 30)
 
     def _build_filters(
@@ -450,7 +452,7 @@ class FactStoreMixin:
             hits = sum(1 for t in terms if t in text)
             if hits > 0:
                 keyword_score = hits / max_score
-                recency = self._recency_score(row["timestamp"] or datetime.utcnow().isoformat())
+                recency = self._recency_score(row["timestamp"] or utcnow().isoformat())
                 final = 0.7 * keyword_score + 0.3 * recency
                 results.append((final, row))
 
@@ -589,7 +591,7 @@ class FactStoreMixin:
     def get_old_unrecalled_facts(
         self, project: str, days: int, limit: int = 50
     ) -> list[dict[str, Any]]:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (utcnow() - timedelta(days=days)).isoformat()
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
@@ -676,7 +678,7 @@ class FactStoreMixin:
         return fact
 
     def prune_old(self, days: int) -> int:
-        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff = (utcnow() - timedelta(days=days)).isoformat()
         with self._connect() as conn:
             cursor = conn.execute("DELETE FROM facts WHERE timestamp < ?", (cutoff,))
             conn.commit()
@@ -801,7 +803,7 @@ class FactStoreMixin:
         with self._connect() as conn:
             conn.execute(
                 "INSERT INTO metrics (project, metric, value, timestamp) VALUES (?, ?, ?, ?)",
-                (project, metric, value, datetime.utcnow().isoformat()),
+                (project, metric, value, utcnow().isoformat()),
             )
             conn.commit()
 
@@ -856,7 +858,7 @@ class FactStoreMixin:
     # ------------------------------------------------------------------
 
     def compute_decay_scores(self, project: str, half_life_days: float = 30.0) -> int:
-        now = datetime.utcnow()
+        now = utcnow()
         facts = self.list_facts(project, limit=100000)
         updated = 0
         for fact in facts:
@@ -964,7 +966,7 @@ class FactStoreMixin:
             content=row["content"] or "",
             source=row["source"] or "",
             tags=json.loads(row["tags"] or "[]"),
-            timestamp=row["timestamp"] or datetime.utcnow().isoformat(),
+            timestamp=row["timestamp"] or utcnow().isoformat(),
             confidence=row["confidence"] if row["confidence"] is not None else 0.0,
             verified_count=row["verified_count"] or 0,
             contradicted_count=row["contradicted_count"] or 0,

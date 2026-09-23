@@ -33,6 +33,7 @@ from acrux.utils import (
     list_ollama_models,
     setup_logging,
     tail_log,
+    utcnow,
     validate_acrux_data,
 )
 
@@ -760,7 +761,7 @@ def curve(ctx: click.Context, project: str | None, days: int) -> None:
         click.echo("No projects found.")
         return
 
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (utcnow() - timedelta(days=days)).isoformat()
     for proj in projects:
         semantic = SemanticStore(
             cfg.projects_dir / proj / "semantic.db", embedder=cfg.create_embedder()
