@@ -1412,6 +1412,65 @@ def mine_patterns(ctx: click.Context, min_projects: int, apply: bool) -> None:
         click.echo(f"Promoted {promoted} skills to global.")
 
 
+@cli.group()
+def backup() -> None:
+    """Create, inspect, and restore checked SQLite backups."""
+
+
+@backup.command("create")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.pass_context
+def backup_create(ctx: click.Context, output: str | None) -> None:
+    """Create a checked backup of live memory databases."""
+    from acrux.backup import BackupService
+
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    manifest = BackupService(cfg.data_dir, root).create()
+    click.echo(f"Created backup {manifest.id} at {manifest.path}")
+
+
+@backup.command("list")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.pass_context
+def backup_list(ctx: click.Context, output: str | None) -> None:
+    """List backups and their validation state."""
+    from acrux.backup import BackupService
+
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    infos = BackupService(cfg.data_dir, root).list()
+    if not infos:
+        click.echo("No backups found")
+        return
+    for info in infos:
+        state = "valid" if info.valid else "invalid"
+        click.echo(f"{info.id}\t{info.created_at}\t{info.project_count} projects\t{info.size} bytes\t{state}")
+
+
+@backup.command("restore")
+@click.argument("reference")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.option("--yes", is_flag=True, help="Confirm restoration without prompting.")
+@click.pass_context
+def backup_restore(ctx: click.Context, reference: str, output: str | None, yes: bool) -> None:
+    """Validate and restore a backup after creating a safety backup."""
+    from acrux.backup import BackupError, BackupService
+
+    if PidFile(DAEMON_PID_FILE).is_running():
+        raise click.ClickException("Stop the Acrux daemon before restoring a backup")
+    if not yes and not click.confirm(f"Restore backup {reference}?"):
+        click.echo("Restore cancelled")
+        return
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    try:
+        result = BackupService(cfg.data_dir, root).restore(reference)
+    except BackupError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Restored {result.backup_id}; safety backup {result.safety_backup_id}")
+
+
 @cli.command()
 @click.argument("batch_id", required=False)
 @click.option("--last", is_flag=True, help="Undo the newest completed batch.")

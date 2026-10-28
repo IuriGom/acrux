@@ -325,11 +325,33 @@ class TestUpgradeFunctional:
         assert result.returncode == 0, result.stderr
 
         log = stub_log_text(sandbox)
-        assert "acrux stop" in log  # daemon stopped first
+        assert "acrux stop" in log
+        assert "acrux backup create" in log
         assert "uv pip install --python" in log and "--upgrade" in log
         assert "@main" in log
-        assert "acrux doctor" in log  # data validation after upgrade
-        assert "acrux daemon --background --mcp http" in log  # restarted
+        assert "acrux doctor" in log
+        assert "acrux daemon --background --mcp http" in log
+        assert log.index("acrux stop") < log.index("acrux backup create") < log.index("uv pip install") < log.index("acrux doctor") < log.index("acrux daemon")
+
+    def test_upgrade_aborts_when_backup_fails(self, sandbox) -> None:
+        venv_bin = sandbox.pia / "venv" / "bin"
+        venv_bin.mkdir(parents=True)
+        failing_stub = """#!/bin/sh
+echo "acrux $*" >> "$STUB_LOG"
+if [ "$1" = "backup" ]; then exit 1; fi
+exit 0
+"""
+        make_executable(venv_bin / "acrux", failing_stub)
+        make_executable(venv_bin / "python", "#!/bin/sh\nexit 0\n")
+
+        result = run_script(UPGRADE_SH, "--channel", "main", env=sandbox.env)
+
+        assert result.returncode != 0
+        log = stub_log_text(sandbox)
+        assert "acrux backup create" in log
+        assert "uv pip install" not in log
+        assert "acrux doctor" not in log
+        assert "acrux daemon" not in log
 
     def test_upgrade_requires_existing_install(self, sandbox) -> None:
         result = run_script(UPGRADE_SH, "--channel", "main", env=sandbox.env)
