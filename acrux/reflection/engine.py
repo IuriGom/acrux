@@ -42,6 +42,10 @@ class ReflectionEngine:
             return KimiProvider(self.mcp_server)
         return NoneProvider()
 
+    async def close(self) -> None:
+        await self.provider.close()
+        await self.semantic.close()
+
     async def reflect_project(self, project: str, batch_size: int = 10) -> dict[str, int]:
         from acrux.utils import available_ram_mb, set_degraded
 

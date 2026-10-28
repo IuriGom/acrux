@@ -20,6 +20,9 @@ class ReflectionProvider(ABC):
         """Extract reusable skills from episodes and facts, with optional rejection feedback."""
         ...
 
+    async def close(self) -> None:
+        pass
+
     def build_reflection_prompt(self, episodes: list[Episode]) -> str:
         text = "\n\n".join(
             f"Task: {e.task}\nOutcome: {e.outcome}\nRoot cause: {e.root_cause}\nFix pattern: {e.fix_pattern}\nTags: {', '.join(e.tags)}"

@@ -30,6 +30,8 @@ class AcruxDaemon:
         self.logger = get_logger()
         self.kimi_watcher = KimiSessionWatcher(config)
         self.claude_watcher = ClaudeSessionWatcher(config)
+        self._reflection_running = False
+        self._active_reflection_projects: set[str] = set()
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
@@ -128,36 +130,54 @@ class AcruxDaemon:
             itr = croniter("0 2 * * *", utcnow())
             return itr.get_next(datetime)
 
+    def _eligible_projects(self) -> list[str]:
+        if not self.config.projects_dir.exists():
+            return []
+        eligible = []
+        for project_dir in self.config.projects_dir.iterdir():
+            if not project_dir.is_dir() or project_dir.name.startswith("_"):
+                continue
+            episodic = EpisodicStore(project_dir / "episodes.db")
+            if episodic.count_unreflected(project_dir.name) > 0:
+                eligible.append(project_dir.name)
+        return eligible
+
     async def _run_reflection(self) -> None:
+        if self._reflection_running:
+            self.logger.info("Scheduled reflection already running; skipping overlapping run")
+            return
+        self._reflection_running = True
         self.logger.info("Running scheduled reflection")
         try:
-            from acrux.verify import SkillVerifier
-
-            for project_dir in self.config.projects_dir.iterdir():
-                if not project_dir.is_dir() or project_dir.name.startswith("_"):
+            for project in self._eligible_projects():
+                if project in self._active_reflection_projects:
+                    self.logger.info("Reflection already running for %s; skipping", project)
                     continue
-                episodic = EpisodicStore(project_dir / "episodes.db")
-                semantic = SemanticStore(
-                    project_dir / "semantic.db", embedder=self.config.create_embedder()
-                )
-                procedural = ProceduralDBStore(project_dir / "skills.db")
-                engine = ReflectionEngine(self.config, episodic, semantic, procedural)
-                result = await engine.reflect_project(project_dir.name)
-                self.logger.info(
-                    "Reflected project %s: +%d facts, +%d skills",
-                    project_dir.name,
-                    result["facts"],
-                    result["skills"],
-                )
-                verify_results = await SkillVerifier(episodic, procedural).verify_project(project_dir.name)
-                verified = sum(1 for errs in verify_results.values() if not errs)
-                if verified:
-                    self.logger.info(
-                        "Verified %d skills for project %s", verified, project_dir.name
+                self._active_reflection_projects.add(project)
+                project_dir = self.config.projects_dir / project
+                try:
+                    episodic = EpisodicStore(project_dir / "episodes.db")
+                    semantic = SemanticStore(
+                        project_dir / "semantic.db", embedder=self.config.create_embedder()
                     )
-                await self._run_reverify(project_dir.name)
-        except Exception as exc:
-            self.logger.exception("Scheduled reflection failed: %s", exc)
+                    procedural = ProceduralDBStore(project_dir / "skills.db")
+                    engine = ReflectionEngine(self.config, episodic, semantic, procedural)
+                    try:
+                        result = await engine.reflect_project(project)
+                        self.logger.info(
+                            "Reflected project %s: +%d facts, +%d skills",
+                            project,
+                            result["facts"],
+                            result["skills"],
+                        )
+                    finally:
+                        await engine.close()
+                except Exception as exc:
+                    self.logger.exception("Scheduled reflection failed for %s: %s", project, exc)
+                finally:
+                    self._active_reflection_projects.discard(project)
+        finally:
+            self._reflection_running = False
 
     async def _run_reverify(self, project: str) -> None:
         if self.config.reflection.provider != "ollama":

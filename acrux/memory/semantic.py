@@ -62,6 +62,10 @@ class SemanticStore(
         self.vector_index = vector_index
         self._rebuild_vector_index()
 
+    async def close(self) -> None:
+        if self.embedder is not None:
+            await self.embedder.close()
+
     def _connect(self) -> sqlite3.Connection:
         """Open a connection to this store's single SQLite database.
 

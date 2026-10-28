@@ -920,8 +920,11 @@ async def acrux_reflect(
     episodic = _project_episodic(project)
     procedural = _project_procedural(project)
     engine = ReflectionEngine(_cfg, episodic, semantic, procedural)
-    result = await engine.reflect_project(project, batch_size)
-    return {"status": "ok", **result}
+    try:
+        result = await engine.reflect_project(project, batch_size)
+        return {"status": "ok", **result}
+    finally:
+        await engine.close()
 
 
 # ---------------------------------------------------------------------------
