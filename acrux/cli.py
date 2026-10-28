@@ -1404,12 +1404,21 @@ def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str |
     proc = subprocess.run(command, capture_output=True, text=True)
     duration = time.time() - start
     outcome = "success" if proc.returncode == 0 else f"error (exit {proc.returncode})"
+    from acrux.capture import cap_text, normalize_error, redact_text
+
+    stdout, stdout_truncated = cap_text(redact_text(proc.stdout))
+    stderr, stderr_truncated = cap_text(redact_text(proc.stderr))
     actions = [
         Action(
             tool="run_command",
             command=" ".join(command),
             result=outcome,
             diff="",
+            exit_code=proc.returncode,
+            stdout=stdout,
+            stderr=stderr,
+            error_signature=normalize_error(proc.returncode, stdout, stderr),
+            output_truncated=stdout_truncated or stderr_truncated,
         )
     ]
     episode = Episode(

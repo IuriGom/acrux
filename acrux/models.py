@@ -17,24 +17,39 @@ class Action:
     command: str = ""
     result: str = ""
     diff: str = ""
+    exit_code: int | None = None
+    stdout: str = ""
+    stderr: str = ""
+    error_signature: str = ""
+    output_truncated: bool = False
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tool": self.tool,
             "target": self.target,
             "command": self.command,
             "result": self.result,
             "diff": self.diff,
+            "exit_code": self.exit_code,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+            "error_signature": self.error_signature,
+            "output_truncated": self.output_truncated,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, str]) -> Action:
+    def from_dict(cls, data: dict[str, Any]) -> Action:
         return cls(
             tool=data.get("tool", ""),
             target=data.get("target", ""),
             command=data.get("command", ""),
             result=data.get("result", ""),
             diff=data.get("diff", ""),
+            exit_code=data.get("exit_code"),
+            stdout=data.get("stdout", ""),
+            stderr=data.get("stderr", ""),
+            error_signature=data.get("error_signature", ""),
+            output_truncated=data.get("output_truncated", False),
         )
 
 
