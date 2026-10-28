@@ -4305,35 +4305,11 @@ async def reverify_facts(
     if not facts:
         return {"status": "ok", "checked": 0, "results": []}
 
-    model = _cfg.reflection.routing.get("reflection", _cfg.reflection.model)
-    results = []
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        for fact in facts:
-            prompt = (
-                "You are a fact-checking assistant. Evaluate whether the following statement "
-                "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
-                f"Statement: {fact.content}\n\nVerdict:"
-            )
-            try:
-                r = await client.post(
-                    f"{_cfg.reflection.host}/api/generate",
-                    json={"model": model, "prompt": prompt, "stream": False},
-                )
-                r.raise_for_status()
-                verdict = r.json().get("response", "Uncertain").strip().split()[0]
-            except Exception as exc:
-                verdict = f"error: {exc}"
-            updated = semantic.record_verification(fact.id, verdict) if fact.id else None
-            results.append(
-                {
-                    "fact_id": fact.id,
-                    "content": fact.content,
-                    "verdict": verdict,
-                    "confidence": updated.confidence if updated else fact.confidence,
-                    "stale": updated.stale if updated else fact.stale,
-                }
-            )
+    from acrux.verify import OllamaFactVerifier
 
+    model = _cfg.reflection.routing.get("reflection", _cfg.reflection.model)
+    verifier = OllamaFactVerifier(model, _cfg.reflection.host)
+    results = await verifier.reverify_project(semantic, project, limit)
     return {"status": "ok", "checked": len(results), "results": results}
 
 

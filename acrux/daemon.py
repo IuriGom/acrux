@@ -182,55 +182,20 @@ class AcruxDaemon:
     async def _run_reverify(self, project: str) -> None:
         if self.config.reflection.provider != "ollama":
             return
-        self.logger.info("Running scheduled re-verification for %s", project)
-        try:
-            semantic = SemanticStore(
-                self.config.projects_dir / project / "semantic.db",
-                embedder=self.config.create_embedder(),
-            )
-            model = self.config.reflection.routing.get("reflection", self.config.reflection.model)
-            import httpx
+        from acrux.verify import OllamaFactVerifier
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                # Promote pending facts after verification
-                pending = semantic.list_pending_facts(project, limit=20)
-                for fact in pending:
-                    verdict = await self._verify_fact(client, model, fact.content)
-                    if verdict == "Yes":
-                        semantic.promote_pending_fact(fact.id)
-                        self.logger.info("Promoted pending fact %s", fact.id)
-                    elif verdict == "No":
-                        semantic.reject_pending_fact(fact.id)
-                        self.logger.info("Rejected pending fact %s", fact.id)
-
-                # Re-verify low-confidence live facts
-                facts = semantic.get_facts_for_reverify(project, limit=10)
-                for fact in facts:
-                    if not fact.id:
-                        continue
-                    verdict = await self._verify_fact(client, model, fact.content)
-                    if verdict:
-                        semantic.record_verification(fact.id, verdict)
-                        self.logger.info("Reverified fact %s: %s", fact.id, verdict)
-        except Exception as exc:
-            self.logger.exception("Scheduled re-verification failed for %s: %s", project, exc)
-
-    async def _verify_fact(self, client, model: str, content: str) -> str | None:
-        prompt = (
-            "You are a fact-checking assistant. Evaluate whether the following statement "
-            "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
-            f"Statement: {content}\n\nVerdict:"
+        self.logger.info("Running explicit re-verification for %s", project)
+        semantic = SemanticStore(
+            self.config.projects_dir / project / "semantic.db", embedder=None
         )
-        try:
-            r = await client.post(
-                f"{self.config.reflection.host}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": False},
-            )
-            r.raise_for_status()
-            return r.json().get("response", "Uncertain").strip().split()[0]
-        except Exception as exc:
-            self.logger.warning("Fact verification failed: %s", exc)
-            return None
+        model = self.config.reflection.routing.get("reflection", self.config.reflection.model)
+        verifier = OllamaFactVerifier(model, self.config.reflection.host)
+        results = await verifier.reverify_project(semantic, project, limit=10)
+        for result in results:
+            if result["verdict"]:
+                self.logger.info(
+                    "Reverified fact %s: %s", result["fact_id"], result["verdict"]
+                )
 
 
 async def run_daemon(config: AcruxConfig) -> None:

@@ -560,32 +560,31 @@ def heal(ctx: click.Context, project: str | None, dry_run: bool) -> None:
         if cfg.reflection.provider != "ollama":
             click.echo("  Reflection provider is not ollama; skipping re-verification")
             continue
-        import httpx
+        from acrux.verify import OllamaFactVerifier
 
         model = cfg.reflection.routing.get("reflection", cfg.reflection.model)
-        reverified = 0
-        for fact in low_conf:
-            prompt = (
-                "You are a fact-checking assistant. Evaluate whether the following statement "
-                "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
-                f"Statement: {fact.content}\n\nVerdict:"
-            )
-            if dry_run:
-                click.echo(f"  [dry-run] would reverify fact {fact.id}: {fact.content[:60]}...")
-                continue
+
+        async def reverify_low_confidence() -> int:
+            verifier = OllamaFactVerifier(model, cfg.reflection.host)
+            count = 0
             try:
-                r = httpx.post(
-                    f"{cfg.reflection.host}/api/generate",
-                    json={"model": model, "prompt": prompt, "stream": False},
-                    timeout=60.0,
-                )
-                r.raise_for_status()
-                verdict = r.json().get("response", "Uncertain").strip().split()[0]
-            except Exception as e:
-                click.echo(f"  Reverify failed for fact {fact.id}: {e}")
-                continue
-            semantic.record_verification(fact.id, verdict)
-            reverified += 1
+                for fact in low_conf:
+                    if dry_run:
+                        click.echo(
+                            f"  [dry-run] would reverify fact {fact.id}: {fact.content[:60]}..."
+                        )
+                        continue
+                    verdict = await verifier.verify_fact(fact.content)
+                    if verdict is None:
+                        click.echo(f"  Reverify failed for fact {fact.id}: invalid verdict")
+                        continue
+                    semantic.record_verification(fact.id, verdict)
+                    count += 1
+                return count
+            finally:
+                await verifier.close()
+
+        reverified = asyncio.run(reverify_low_confidence())
         click.echo(f"  Low-confidence facts re-verified: {reverified}")
 
 
