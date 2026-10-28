@@ -221,6 +221,10 @@ class AcruxConfig:
         return self.data_dir / "projects"
 
     @property
+    def backup_dir(self) -> Path:
+        return Path.home() / ".acrux" / "backups"
+
+    @property
     def config_path(self) -> Path:
         return Path.home() / ".acrux" / "config.yaml"
 
