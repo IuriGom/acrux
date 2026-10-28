@@ -1,7 +1,7 @@
 # Foundation: Trusted Learning and Recovery — Design Spec
 
 Date: 2026-10-28
-Status: Awaiting written-spec approval
+Status: Approved with review revisions
 
 ## Purpose
 
@@ -158,7 +158,7 @@ Metrics, recall counters that are purely observational, and health history are n
 
 ### Locking and crash behavior
 
-All journaled mutations and undo operations acquire the same project write lock. Each per-store SQLite transaction attaches the journal database and commits the row mutation and its journal entry atomically, so a committed row mutation cannot lack a journal image. A multi-store batch remains incomplete until every per-store transaction commits. A crash leaves an incomplete batch discoverable; it can be inspected and undone, and is never silently marked complete.
+All journaled mutations and undo operations acquire the same project write lock. Because SQLite WAL mode does not guarantee atomic commits across attached databases, the journal first durably commits each before-image, then the store commits its mutation, then the journal durably records the after-image. Therefore a committed row mutation always has a recovery image without relying on cross-database WAL atomicity. A multi-store batch remains incomplete until every per-store mutation and after-image is recorded. A crash between these steps leaves an incomplete batch discoverable; it can be inspected and undone, and is never silently marked complete.
 
 On daemon startup and whenever a project write lock is acquired for a new mutation batch, Acrux checks for incomplete batches. If one exists, it emits a prominent warning containing the project, batch ID, creation time, last completed sequence, and the exact recovery command: `acrux undo BATCH_ID --project PROJECT`. New mutation batches for that project pause until the incomplete batch is explicitly recovered; reads and the undo operation remain available. Acrux does not automatically roll back crashed work, because the user must see and confirm restoration of the partial state.
 
