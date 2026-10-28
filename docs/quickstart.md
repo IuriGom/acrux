@@ -83,6 +83,27 @@ Semantic recall is exposed to agents through the `acrux_recall` / `acrux_context
 tools and the Python SDK (`acrux.sdk.AcruxClient`); the CLI measures its quality with
 `acrux recall-bench --project myrepo`.
 
+## 8. Capture evidence and recover safely
+
+```bash
+acrux wrap --project myrepo -- pytest -q       # record output, errors, and command-only diffs
+acrux ingest-git . --project myrepo            # deterministic commit history, no LLM calls
+acrux undo --last --project myrepo             # confirmed exact batch restoration
+acrux backup create
+acrux backup list
+acrux stop                                     # required before restore
+acrux backup restore BACKUP_ID                 # validates and creates a safety backup first
+```
+
+Scheduled reflection runs only for projects with unreflected episodes and never
+re-verifies facts or skills automatically. Verification is explicit through the CLI/API.
+
+An incomplete batch pauses new mutations and prints its recovery command:
+`acrux undo BATCH_ID --project PROJECT`. Undo refuses to overwrite later conflicting edits.
+
+Captured evidence is bounded and obvious credentials are redacted, but automatic secret
+detection is not exhaustive. Backups exclude configuration and API tokens.
+
 ## Verify the install
 
 ```bash

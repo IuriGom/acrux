@@ -11,6 +11,7 @@ from acrux.utils import PidFile
 def _setup(tmp_path, monkeypatch):
     config = AcruxConfig(data_dir=tmp_path / "data")
     monkeypatch.setattr(AcruxConfig, "load", classmethod(lambda cls: config))
+    monkeypatch.setattr(AcruxConfig, "backup_dir", tmp_path / "backups")
     episodic = EpisodicStore(config.projects_dir / "demo" / "episodes.db")
     episodic.add(Episode(session_id="original", task="original", project="demo"))
     service = BackupService(config.data_dir, config.backup_dir)
