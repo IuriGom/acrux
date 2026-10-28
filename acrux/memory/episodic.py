@@ -9,6 +9,7 @@ from pathlib import Path
 
 from typing import Any
 
+from acrux.memory.journal import mutation_scope, record_after, record_before
 from acrux.models import Action, Episode
 
 from acrux.utils import utcnow
@@ -99,49 +100,64 @@ class EpisodicStore:
             for row in rows
         ]
 
-    def add(self, episode: Episode) -> None:
+    def add(self, episode: Episode, batch_id: str | None = None) -> None:
         self._tag_errors(episode)
         self._tag_source(episode)
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO episodes
-                (session_id, task, project, context, actions, outcome, root_cause,
-                 fix_pattern, tags, timestamp, corrected, compacted, source, git_info)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    episode.session_id,
-                    episode.task,
-                    episode.project,
-                    json.dumps(episode.context),
-                    json.dumps([a.to_dict() for a in episode.actions]),
-                    episode.outcome,
-                    episode.root_cause,
-                    episode.fix_pattern,
-                    json.dumps(episode.tags),
-                    episode.timestamp,
-                    1 if episode.corrected else 0,
-                    1 if episode.compacted else 0,
-                    episode.source,
-                    json.dumps(episode.git_info) if episode.git_info is not None else None,
-                ),
-            )
-            rowid = conn.execute(
-                "SELECT rowid FROM episodes WHERE session_id = ?", (episode.session_id,)
-            ).fetchone()[0]
-            conn.execute(
-                "INSERT INTO episodes_fts(rowid, task, outcome, root_cause, fix_pattern, tags) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    rowid,
-                    episode.task,
-                    episode.outcome,
-                    episode.root_cause,
-                    episode.fix_pattern,
-                    " ".join(episode.tags),
-                ),
-            )
-            conn.commit()
+        with mutation_scope(self, batch_id, "episode.add") as (journal, active_batch):
+            with sqlite3.connect(self.db_path) as conn:
+                sequence = record_before(
+                    self, journal, active_batch, conn, "episodes", "session_id", episode.session_id
+                )
+                existing = conn.execute(
+                    "SELECT * FROM episodes WHERE session_id = ?", (episode.session_id,)
+                ).fetchone()
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO episodes
+                    (session_id, task, project, context, actions, outcome, root_cause,
+                     fix_pattern, tags, timestamp, corrected, compacted, source, git_info)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        episode.session_id,
+                        episode.task,
+                        episode.project,
+                        json.dumps(episode.context),
+                        json.dumps([a.to_dict() for a in episode.actions]),
+                        episode.outcome,
+                        episode.root_cause,
+                        episode.fix_pattern,
+                        json.dumps(episode.tags),
+                        episode.timestamp,
+                        1 if episode.corrected else 0,
+                        1 if episode.compacted else 0,
+                        episode.source,
+                        json.dumps(episode.git_info) if episode.git_info is not None else None,
+                    ),
+                )
+                rowid = conn.execute(
+                    "SELECT rowid FROM episodes WHERE session_id = ?", (episode.session_id,)
+                ).fetchone()[0]
+                if existing:
+                    conn.execute(
+                        "INSERT INTO episodes_fts(episodes_fts, rowid, task, outcome, root_cause, fix_pattern, tags) VALUES ('delete', ?, ?, ?, ?, ?, ?)",
+                        (rowid, existing["task"], existing["outcome"], existing["root_cause"], existing["fix_pattern"], existing["tags"]),
+                    )
+                conn.execute(
+                    "INSERT INTO episodes_fts(rowid, task, outcome, root_cause, fix_pattern, tags) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        rowid,
+                        episode.task,
+                        episode.outcome,
+                        episode.root_cause,
+                        episode.fix_pattern,
+                        " ".join(episode.tags),
+                    ),
+                )
+                conn.commit()
+                record_after(
+                    self, journal, conn, "episodes", "session_id", episode.session_id, sequence
+                )
 
     def _tag_source(self, episode: Episode) -> None:
         if episode.source and episode.source.lower() == "kimi" and "kimi" not in episode.tags:
@@ -244,15 +260,23 @@ class EpisodicStore:
             ).fetchall()
         return [self._row_to_episode(row) for row in rows]
 
-    def delete_by_id(self, session_id: str) -> bool:
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
-                "SELECT rowid FROM episodes WHERE session_id = ?", (session_id,)
-            ).fetchone()
-            if row:
-                conn.execute("DELETE FROM episodes_fts WHERE rowid = ?", (row[0],))
-            cursor = conn.execute("DELETE FROM episodes WHERE session_id = ?", (session_id,))
-            conn.commit()
+    def delete_by_id(self, session_id: str, batch_id: str | None = None) -> bool:
+        with mutation_scope(self, batch_id, "episode.delete") as (journal, active_batch):
+            with sqlite3.connect(self.db_path) as conn:
+                sequence = record_before(
+                    self, journal, active_batch, conn, "episodes", "session_id", session_id
+                )
+                row = conn.execute(
+                    "SELECT rowid AS episode_rowid, * FROM episodes WHERE session_id = ?", (session_id,)
+                ).fetchone()
+                if row:
+                    conn.execute(
+                        "INSERT INTO episodes_fts(episodes_fts, rowid, task, outcome, root_cause, fix_pattern, tags) VALUES ('delete', ?, ?, ?, ?, ?, ?)",
+                        (row["episode_rowid"], row["task"], row["outcome"], row["root_cause"], row["fix_pattern"], row["tags"]),
+                    )
+                cursor = conn.execute("DELETE FROM episodes WHERE session_id = ?", (session_id,))
+                conn.commit()
+                record_after(self, journal, conn, "episodes", "session_id", session_id, sequence)
         return cursor.rowcount > 0
 
     def list_episodes(
@@ -288,16 +312,27 @@ class EpisodicStore:
             ).fetchall()
         return [self._row_to_episode(row) for row in rows]
 
-    def mark_compacted(self, session_ids: list[str]) -> None:
+    def mark_compacted(self, session_ids: list[str], batch_id: str | None = None) -> None:
         if not session_ids:
             return
-        placeholders = ", ".join("?" for _ in session_ids)
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                f"UPDATE episodes SET compacted = 1 WHERE session_id IN ({placeholders})",
-                session_ids,
-            )
-            conn.commit()
+        with mutation_scope(self, batch_id, "episode.mark_compacted") as (journal, active_batch):
+            placeholders = ", ".join("?" for _ in session_ids)
+            with sqlite3.connect(self.db_path) as conn:
+                sequences = {
+                    session_id: record_before(
+                        self, journal, active_batch, conn, "episodes", "session_id", session_id
+                    )
+                    for session_id in session_ids
+                }
+                conn.execute(
+                    f"UPDATE episodes SET compacted = 1 WHERE session_id IN ({placeholders})",
+                    session_ids,
+                )
+                conn.commit()
+                for session_id, sequence in sequences.items():
+                    record_after(
+                        self, journal, conn, "episodes", "session_id", session_id, sequence
+                    )
 
     def get_failed(self, project: str, limit: int = 100) -> list[Episode]:
         with sqlite3.connect(self.db_path) as conn:

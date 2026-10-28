@@ -68,7 +68,21 @@ class MutationJournal:
                     key_column TEXT NOT NULL,
                     key_json TEXT NOT NULL,
                     before_json TEXT,
-                    after_json TEXT
+                    after_json TEXT,
+                    after_recorded INTEGER DEFAULT 0
+                )
+                """
+            )
+            entry_columns = {row[1] for row in conn.execute("PRAGMA table_info(mutation_entries)")}
+            if "after_recorded" not in entry_columns:
+                conn.execute("ALTER TABLE mutation_entries ADD COLUMN after_recorded INTEGER DEFAULT 0")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mutation_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    batch_id TEXT NOT NULL,
+                    restored_entries INTEGER NOT NULL,
+                    created_at TEXT NOT NULL
                 )
                 """
             )
@@ -118,7 +132,7 @@ class MutationJournal:
     def record_after(self, sequence: int, after: dict[str, Any] | None) -> None:
         with self._connect() as conn:
             conn.execute(
-                "UPDATE mutation_entries SET after_json = ? WHERE sequence = ?",
+                "UPDATE mutation_entries SET after_json = ?, after_recorded = 1 WHERE sequence = ?",
                 (json.dumps(after) if after is not None else None, sequence),
             )
             conn.commit()
@@ -126,7 +140,7 @@ class MutationJournal:
     def complete(self, batch_id: str) -> None:
         with self._connect() as conn:
             missing = conn.execute(
-                "SELECT COUNT(*) FROM mutation_entries WHERE batch_id = ? AND after_json IS NULL",
+                "SELECT COUNT(*) FROM mutation_entries WHERE batch_id = ? AND after_recorded = 0",
                 (batch_id,),
             ).fetchone()[0]
             if missing:
@@ -185,6 +199,14 @@ class MutationJournal:
             )
             conn.commit()
 
+    def record_undo(self, batch_id: str, restored_entries: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO mutation_audit (batch_id, restored_entries, created_at) VALUES (?, ?, ?)",
+                (batch_id, restored_entries, utcnow().isoformat()),
+            )
+            conn.commit()
+
 
 class MutationBatch:
     def __init__(self, project_dir: Path, operation: str):
@@ -221,3 +243,56 @@ class MutationBatch:
                 self._lock.__exit__(exc_type, exc_value, traceback)
                 self._lock = None
         return False
+
+
+class JoinedMutation:
+    def __init__(self, journal: MutationJournal, batch_id: str):
+        self.journal = journal
+        self.batch_id = batch_id
+
+    def __enter__(self):
+        return self.journal, self.batch_id
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+
+class ScopedMutation:
+    def __init__(self, batch: MutationBatch):
+        self.batch = batch
+
+    def __enter__(self):
+        self.batch.__enter__()
+        return self.batch.journal, self.batch.id
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return self.batch.__exit__(exc_type, exc_value, traceback)
+
+
+def mutation_scope(store, batch_id: str | None, operation: str):
+    if batch_id is not None:
+        return JoinedMutation(MutationJournal(store.db_path.parent), batch_id)
+    return ScopedMutation(MutationBatch(store.db_path.parent, operation))
+
+
+def row_image(conn: sqlite3.Connection, table_name: str, key_column: str, key: Any):
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(f"SELECT * FROM {table_name} WHERE {key_column} = ?", (key,)).fetchone()
+    return dict(row) if row else None
+
+
+def record_before(store, journal: MutationJournal, batch_id: str, conn, table_name: str, key_column: str, key: Any) -> int:
+    before = row_image(conn, table_name, key_column, key)
+    return journal.record_before(
+        batch_id,
+        store.db_path,
+        table_name,
+        key_column,
+        key,
+        before,
+    )
+
+
+def record_after(store, journal: MutationJournal, conn, table_name: str, key_column: str, key: Any, sequence: int) -> None:
+    after = row_image(conn, table_name, key_column, key)
+    journal.record_after(sequence, after)

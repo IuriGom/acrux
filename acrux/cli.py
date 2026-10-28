@@ -586,7 +586,7 @@ def heal(ctx: click.Context, project: str | None, dry_run: bool) -> None:
 
         model = cfg.reflection.routing.get("reflection", cfg.reflection.model)
 
-        async def reverify_low_confidence() -> int:
+        async def reverify_low_confidence(model=model, low_conf=low_conf, semantic=semantic) -> int:
             verifier = OllamaFactVerifier(model, cfg.reflection.host)
             count = 0
             try:
@@ -1410,6 +1410,31 @@ def mine_patterns(ctx: click.Context, min_projects: int, apply: bool) -> None:
                     promoted += 1
                     break
         click.echo(f"Promoted {promoted} skills to global.")
+
+
+@cli.command()
+@click.argument("batch_id", required=False)
+@click.option("--last", is_flag=True, help="Undo the newest completed batch.")
+@click.option("--project", required=True, help="Project that owns the batch.")
+@click.option("--yes", is_flag=True, help="Confirm restoration without prompting.")
+@click.pass_context
+def undo(ctx: click.Context, batch_id: str | None, last: bool, project: str, yes: bool) -> None:
+    """Restore exact before-images from a journaled mutation batch."""
+    from acrux.undo import UndoCoordinator, UndoError
+
+    if bool(batch_id) == last:
+        raise click.ClickException("Provide exactly one batch ID or --last")
+    target = batch_id or "latest completed batch"
+    if not yes and not click.confirm(f"Undo {target} for project {project}?"):
+        click.echo("Undo cancelled")
+        return
+    try:
+        result = UndoCoordinator(ctx.obj["config"].projects_dir / project).undo(
+            batch_id=batch_id, last=last
+        )
+    except UndoError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Undid batch {result.batch_id}: {result.restored_entries} entries restored")
 
 
 @cli.command()
