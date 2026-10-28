@@ -1401,6 +1401,13 @@ def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str |
     task = task or " ".join(command)
     git_before = git_context(Path.cwd())
     start = time.time()
+    session_id = f"wrap-{int(start)}"
+    from acrux.provenance import WorktreeSnapshot
+
+    try:
+        snapshot = WorktreeSnapshot.capture(Path.cwd(), project, session_id)
+    except (OSError, subprocess.CalledProcessError):
+        snapshot = None
     proc = subprocess.run(command, capture_output=True, text=True)
     duration = time.time() - start
     outcome = "success" if proc.returncode == 0 else f"error (exit {proc.returncode})"
@@ -1421,8 +1428,13 @@ def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str |
             output_truncated=stdout_truncated or stderr_truncated,
         )
     ]
+    changes = snapshot.changes_since() if snapshot is not None else []
+    if changes:
+        semantic = SemanticStore(cfg.projects_dir / project / "semantic.db", embedder=None)
+        for change in changes:
+            semantic.add_code_change(change)
     episode = Episode(
-        session_id=f"wrap-{int(start)}",
+        session_id=session_id,
         task=task,
         project=project,
         context={"git_before": git_before, "duration_s": round(duration, 2)},
