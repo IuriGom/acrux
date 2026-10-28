@@ -3,6 +3,19 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
+
+
+def is_secret_path(path: Path) -> bool:
+    parts = {part.casefold() for part in path.parts}
+    if ".git" in parts or ".ssh" in parts:
+        return True
+    name = path.name.casefold()
+    if name == ".env" or name.startswith(".env."):
+        return True
+    if name in {"credentials", ".netrc", ".npmrc", "id_rsa", "id_ed25519"}:
+        return True
+    return path.suffix.casefold() in {".key", ".pem", ".p12", ".pfx", ".kdbx"}
 
 
 def cap_text(text: str, limit: int = 16384) -> tuple[str, bool]:

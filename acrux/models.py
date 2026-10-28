@@ -54,6 +54,38 @@ class Action:
 
 
 @dataclass
+class CodeChange:
+    project: str
+    session_id: str = ""
+    commit_sha: str | None = None
+    file_path: str = ""
+    change_type: str = "modify"
+    diff: str = ""
+    truncated: bool = False
+    source: str = "wrap"
+    timestamp: str = field(default_factory=lambda: utcnow().isoformat())
+    content_hash: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project": self.project,
+            "session_id": self.session_id,
+            "commit_sha": self.commit_sha,
+            "file_path": self.file_path,
+            "change_type": self.change_type,
+            "diff": self.diff,
+            "truncated": self.truncated,
+            "source": self.source,
+            "timestamp": self.timestamp,
+            "content_hash": self.content_hash,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CodeChange:
+        return cls(**data)
+
+
+@dataclass
 class Episode:
     session_id: str
     task: str
