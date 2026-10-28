@@ -41,6 +41,7 @@ class AcruxDaemon:
         pid_file = PidFile(DAEMON_PID_FILE)
         pid_file.write(os.getpid())
         self.logger.info("Starting acrux daemon (transport=%s)", self.config.mcp.transport)
+        self._warn_incomplete_batches()
         server_task = asyncio.create_task(self._run_server())
         scheduler_task = asyncio.create_task(self._run_scheduler())
         # NOTE: the daemon deliberately does NOT serve the app API (port 11438).
@@ -66,6 +67,26 @@ class AcruxDaemon:
 
     def _request_stop(self) -> None:
         self.stop_event.set()
+
+    def _warn_incomplete_batches(self) -> None:
+        from acrux.memory.journal import MutationJournal
+
+        if not self.config.projects_dir.exists():
+            return
+        for project_dir in self.config.projects_dir.iterdir():
+            if not project_dir.is_dir() or project_dir.name.startswith("_"):
+                continue
+            for batch in MutationJournal(project_dir).incomplete():
+                self.logger.warning(
+                    "Incomplete mutation batch %s for %s (created %s, last sequence %d); "
+                    "new mutations paused. Recover with: acrux undo %s --project %s",
+                    batch.id,
+                    batch.project,
+                    batch.created_at,
+                    batch.last_sequence,
+                    batch.id,
+                    batch.project,
+                )
 
     async def _run_server(self) -> None:
         if self.config.mcp.transport == "http":
