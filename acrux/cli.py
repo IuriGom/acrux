@@ -477,6 +477,28 @@ def ingest_code(ctx: click.Context, path: str, project: str, max_files: int) -> 
     click.echo(f"Ingested {added} facts from {path} into {project}.")
 
 
+@cli.command("ingest-git")
+@click.argument("path", type=click.Path(exists=True, file_okay=False))
+@click.option("--project", required=True, help="Project to ingest into.")
+@click.option("--max-commits", default=None, type=int, help="Maximum newest commits to ingest.")
+@click.pass_context
+def ingest_git_command(ctx: click.Context, path: str, project: str, max_commits: int | None) -> None:
+    """Ingest deterministic commit provenance from a Git worktree."""
+    from acrux.git_ingest import ingest_git
+
+    cfg = ctx.obj["config"]
+    semantic = SemanticStore(cfg.projects_dir / project / "semantic.db", embedder=None)
+    episodic = EpisodicStore(cfg.projects_dir / project / "episodes.db")
+    try:
+        result = ingest_git(Path(path), project, semantic, episodic, max_commits)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise click.ClickException(f"Could not ingest Git repository: {exc}") from exc
+    click.echo(
+        f"Scanned {result['commits']} commits; imported {result['imported']} "
+        f"with {result['code_changes']} code changes."
+    )
+
+
 @cli.command()
 @click.option("--project", default=None, help="Project to heal (default: all).")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without changing anything.")
