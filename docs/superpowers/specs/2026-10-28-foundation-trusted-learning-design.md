@@ -91,7 +91,9 @@ A normalized signature removes volatile paths, line numbers, timestamps, memory 
 
 ### Capture
 
-For a wrapped command inside a Git worktree, compare relevant before/after working-tree state and record unified diffs per changed file. Include additions, modifications, deletions, renames where Git reports them, and untracked files created by the command. Binary files receive metadata and a binary-change marker rather than binary content.
+For a wrapped command inside a Git worktree, snapshot the pre-command worktree state before starting the child process. For every eligible tracked-modified and untracked file, record its path, status, content hash, and the pre-execution content needed for comparison. After the command exits, compare that baseline with the resulting worktree and generate unified diffs from the pre-command file state to the post-command file state—not from `HEAD` to the post-command state. Therefore, pre-existing dirty-tree edits and pre-existing untracked files are not attributed to the wrapped command; only the delta introduced while the command ran is written to `code_changes`.
+
+Include additions, modifications, deletions, renames where Git reports them, and untracked files created by the command. Binary files receive metadata and a binary-change marker rather than binary content.
 
 Limits:
 
@@ -132,12 +134,12 @@ Each commit receives exactly one primary classification, using deterministic met
 
 1. `docs` when all changed paths are documentation-only.
 2. `test` when all changed paths are tests or test fixtures.
-3. `fix` when the subject or diff indicates bug fixing, regression, error handling, or a hotfix.
+3. `fix` when the subject/commit message explicitly indicates bug fixing, regression, or a hotfix. Diff-level error-handling patterns can independently select `fix` only when they modify existing functions and add no net-new feature modules or exports. If such modules or exports are present, diff-level error-handling evidence cannot override `feature` without subject/commit-message corroboration.
 4. `refactor` when the subject indicates restructuring without behavior change or the diff is dominated by renames/moves.
 5. `feature` when the subject indicates a feature/addition or new implementation files and behavior are added.
 6. `chore` for dependency, build, CI, formatting, release, and other maintenance changes.
 
-Conventional Commit prefixes inform the decision but do not override an unambiguous all-docs or all-tests commit. Merge commits use their subject and first-parent diff. Empty commits are retained as commit episodes with no `code_changes` rows. Classification and confidence are stored as metadata; no Ollama or other LLM call is permitted.
+Conventional Commit prefixes inform the decision but do not override an unambiguous all-docs or all-tests commit. A `fix:` subject is sufficient corroboration for a mixed fix/feature diff; an error-handling-only diff is not. Merge commits use their subject and first-parent diff. Empty commits are retained as commit episodes with no `code_changes` rows. Classification and confidence are stored as metadata; no Ollama or other LLM call is permitted.
 
 Commit episodes include author, committer date, parent SHAs, subject, classification, and source repository identity, but not credentials from remotes.
 
@@ -157,6 +159,8 @@ Metrics, recall counters that are purely observational, and health history are n
 ### Locking and crash behavior
 
 All journaled mutations and undo operations acquire the same project write lock. Each per-store SQLite transaction attaches the journal database and commits the row mutation and its journal entry atomically, so a committed row mutation cannot lack a journal image. A multi-store batch remains incomplete until every per-store transaction commits. A crash leaves an incomplete batch discoverable; it can be inspected and undone, and is never silently marked complete.
+
+On daemon startup and whenever a project write lock is acquired for a new mutation batch, Acrux checks for incomplete batches. If one exists, it emits a prominent warning containing the project, batch ID, creation time, last completed sequence, and the exact recovery command: `acrux undo BATCH_ID --project PROJECT`. New mutation batches for that project pause until the incomplete batch is explicitly recovered; reads and the undo operation remain available. Acrux does not automatically roll back crashed work, because the user must see and confirm restoration of the partial state.
 
 Undo does not use timestamps to select rows and does not infer inverse operations from natural-language content.
 
@@ -275,10 +279,11 @@ Reflection engines/providers and embedders support deterministic cleanup. Schedu
 Add tests beside the existing `acrux/tests` suite for:
 
 - 16 KiB stream caps, UTF-8 boundaries, exit statuses, error normalization, and credential redaction.
+- Pre-command dirty-tree baselines that exclude pre-existing edits/untracked files and capture only command-introduced deltas.
 - Secret-path exclusion, binary/untracked/rename handling, 32 KiB file caps, and 256 KiB session caps.
 - `code_changes` round trips and repeated-import idempotency.
-- All six commit classifications, precedence rules, merges, empty commits, and proof that ingestion performs no LLM calls.
-- Multi-store batch undo, recreated deleted rows, removed new rows, pending records, FTS/vector consistency, conflicts, incomplete batches, confirmation, and lock use.
+- All six commit classifications, narrowed fix/feature precedence, merges, empty commits, and proof that ingestion performs no LLM calls.
+- Multi-store batch undo, recreated deleted rows, removed new rows, pending records, FTS/vector consistency, conflicts, incomplete-batch warnings/recovery, confirmation, and lock use.
 - Manifest/checksum validation, traversal rejection, safety-backup creation, successful restore, failed-restore rollback, and config/token exclusion.
 - Upgrade-script ordering and abort-on-backup-failure.
 - Zero Ollama calls for idle projects and automatic re-verification, eligible-only scheduling, overlap prevention, exact manual request bounds, and deterministic provider/embedder cleanup.
@@ -302,12 +307,12 @@ Then run the complete Python test suite and the project's lint checks. On the ac
 
 Keep Git history current with one commit per completed, tested slice:
 
-1. Failure capture and redaction.
-2. Diff provenance and `code_changes`.
-3. Deterministic `ingest-git`.
-4. Journaling and batch undo.
-5. Backup/restore and upgrade integration.
-6. Ollama scheduler/request/lifecycle correction.
+1. Ollama scheduler/request/lifecycle correction.
+2. Failure capture and redaction.
+3. Diff provenance and `code_changes`.
+4. Deterministic `ingest-git`.
+5. Journaling and batch undo.
+6. Backup/restore and upgrade integration.
 7. End-to-end documentation and any final verification fixes.
 
 A slice is committed only after its tests pass. The final report lists each commit and the exact verification results; unverified workstation behavior is stated plainly rather than claimed as complete.
