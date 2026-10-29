@@ -32,6 +32,7 @@ class ReflectionEngine:
         self.semantic = semantic
         self.procedural = procedural
         self.mcp_server = mcp_server
+        self._mutation_batch_id = None
         self.provider = self._create_provider()
 
     def _create_provider(self) -> ReflectionProvider:
@@ -42,9 +43,26 @@ class ReflectionEngine:
             return KimiProvider(self.mcp_server)
         return NoneProvider()
 
-    async def reflect_project(self, project: str, batch_size: int = 10) -> dict[str, int]:
+    async def close(self) -> None:
+        await self.provider.close()
+        await self.semantic.close()
+
+    async def reflect_project(
+        self, project: str, batch_size: int = 10, batch_id: str | None = None
+    ) -> dict[str, int]:
+        if batch_id is not None:
+            return await self._reflect_project(project, batch_size, batch_id)
+        from acrux.memory.journal import MutationBatch
+
+        with MutationBatch(self.episodic.db_path.parent, "reflection") as batch:
+            return await self._reflect_project(project, batch_size, batch.id)
+
+    async def _reflect_project(
+        self, project: str, batch_size: int, batch_id: str
+    ) -> dict[str, int]:
         from acrux.utils import available_ram_mb, set_degraded
 
+        self._mutation_batch_id = batch_id
         batch_size = min(batch_size, self.config.max_batch_size)
         if not self.config.check_storage_budget():
             raise RuntimeError("Storage budget exceeded. Run 'acrux prune' or increase the limit.")
@@ -77,7 +95,7 @@ class ReflectionEngine:
             for fact in facts:
                 fact.tags = list(set(fact.tags + ["correction", "high-signal"]))
                 fact.confidence = min(1.0, fact.confidence + 0.2)
-                self.semantic.add_pending_fact(fact)
+                self.semantic.add_pending_fact(fact, batch_id=self._mutation_batch_id)
             total_facts += len(facts)
             skills = await self.provider.extract_kimi_skills(corrected, facts)
             validated = 0
@@ -93,7 +111,9 @@ class ReflectionEngine:
                 )
             total_skills += validated
             if facts or validated:
-                self.episodic.mark_compacted([e.session_id for e in corrected])
+                self.episodic.mark_compacted(
+                    [e.session_id for e in corrected], batch_id=self._mutation_batch_id
+                )
 
         kimi_episodes = [e for e in remaining if self._is_kimi(e)]
         normal_episodes = [e for e in remaining if not self._is_kimi(e)]
@@ -102,7 +122,7 @@ class ReflectionEngine:
             for cluster in await self._cluster_episodes(kimi_episodes):
                 facts = await self.provider.reflect_kimi_episodes(cluster)
                 for fact in facts:
-                    self.semantic.add_pending_fact(fact)
+                    self.semantic.add_pending_fact(fact, batch_id=self._mutation_batch_id)
                 total_facts += len(facts)
 
                 skills = await self.provider.extract_kimi_skills(cluster, facts)
@@ -119,13 +139,15 @@ class ReflectionEngine:
                 total_skills += validated
 
                 if facts or validated:
-                    self.episodic.mark_compacted([e.session_id for e in cluster])
+                    self.episodic.mark_compacted(
+                        [e.session_id for e in cluster], batch_id=self._mutation_batch_id
+                    )
 
         if normal_episodes:
             for cluster in await self._cluster_episodes(normal_episodes):
                 facts = await self.provider.reflect_episodes(cluster)
                 for fact in facts:
-                    self.semantic.add_pending_fact(fact)
+                    self.semantic.add_pending_fact(fact, batch_id=self._mutation_batch_id)
                 total_facts += len(facts)
 
                 skills = await self.provider.extract_skills(cluster, facts)
@@ -142,7 +164,9 @@ class ReflectionEngine:
                 total_skills += validated
 
                 if facts or validated:
-                    self.episodic.mark_compacted([e.session_id for e in cluster])
+                    self.episodic.mark_compacted(
+                        [e.session_id for e in cluster], batch_id=self._mutation_batch_id
+                    )
 
         return {"facts": total_facts, "skills": total_skills}
 
@@ -160,7 +184,7 @@ class ReflectionEngine:
             skill.tags = list(set(skill.tags + extra_tags))
         ok, errors = await verifier.verify(skill)
         if ok:
-            self.procedural.add_pending(skill)
+            self.procedural.add_pending(skill, batch_id=self._mutation_batch_id)
             return 1
         if retry_extract is not None:
             retried = await retry_extract("; ".join(errors))
@@ -170,7 +194,7 @@ class ReflectionEngine:
                     candidate.tags = list(set(candidate.tags + extra_tags))
                 ok, _ = await verifier.verify(candidate)
                 if ok:
-                    self.procedural.add_pending(candidate)
+                    self.procedural.add_pending(candidate, batch_id=self._mutation_batch_id)
                     return 1
         self._log_skill_rejected(project, skill, errors)
         return 0

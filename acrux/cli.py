@@ -477,6 +477,28 @@ def ingest_code(ctx: click.Context, path: str, project: str, max_files: int) -> 
     click.echo(f"Ingested {added} facts from {path} into {project}.")
 
 
+@cli.command("ingest-git")
+@click.argument("path", type=click.Path(exists=True, file_okay=False))
+@click.option("--project", required=True, help="Project to ingest into.")
+@click.option("--max-commits", default=None, type=int, help="Maximum newest commits to ingest.")
+@click.pass_context
+def ingest_git_command(ctx: click.Context, path: str, project: str, max_commits: int | None) -> None:
+    """Ingest deterministic commit provenance from a Git worktree."""
+    from acrux.git_ingest import ingest_git
+
+    cfg = ctx.obj["config"]
+    semantic = SemanticStore(cfg.projects_dir / project / "semantic.db", embedder=None)
+    episodic = EpisodicStore(cfg.projects_dir / project / "episodes.db")
+    try:
+        result = ingest_git(Path(path), project, semantic, episodic, max_commits)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise click.ClickException(f"Could not ingest Git repository: {exc}") from exc
+    click.echo(
+        f"Scanned {result['commits']} commits; imported {result['imported']} "
+        f"with {result['code_changes']} code changes."
+    )
+
+
 @cli.command()
 @click.option("--project", default=None, help="Project to heal (default: all).")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without changing anything.")
@@ -560,32 +582,31 @@ def heal(ctx: click.Context, project: str | None, dry_run: bool) -> None:
         if cfg.reflection.provider != "ollama":
             click.echo("  Reflection provider is not ollama; skipping re-verification")
             continue
-        import httpx
+        from acrux.verify import OllamaFactVerifier
 
         model = cfg.reflection.routing.get("reflection", cfg.reflection.model)
-        reverified = 0
-        for fact in low_conf:
-            prompt = (
-                "You are a fact-checking assistant. Evaluate whether the following statement "
-                "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
-                f"Statement: {fact.content}\n\nVerdict:"
-            )
-            if dry_run:
-                click.echo(f"  [dry-run] would reverify fact {fact.id}: {fact.content[:60]}...")
-                continue
+
+        async def reverify_low_confidence(model=model, low_conf=low_conf, semantic=semantic) -> int:
+            verifier = OllamaFactVerifier(model, cfg.reflection.host)
+            count = 0
             try:
-                r = httpx.post(
-                    f"{cfg.reflection.host}/api/generate",
-                    json={"model": model, "prompt": prompt, "stream": False},
-                    timeout=60.0,
-                )
-                r.raise_for_status()
-                verdict = r.json().get("response", "Uncertain").strip().split()[0]
-            except Exception as e:
-                click.echo(f"  Reverify failed for fact {fact.id}: {e}")
-                continue
-            semantic.record_verification(fact.id, verdict)
-            reverified += 1
+                for fact in low_conf:
+                    if dry_run:
+                        click.echo(
+                            f"  [dry-run] would reverify fact {fact.id}: {fact.content[:60]}..."
+                        )
+                        continue
+                    verdict = await verifier.verify_fact(fact.content)
+                    if verdict is None:
+                        click.echo(f"  Reverify failed for fact {fact.id}: invalid verdict")
+                        continue
+                    semantic.record_verification(fact.id, verdict)
+                    count += 1
+                return count
+            finally:
+                await verifier.close()
+
+        reverified = asyncio.run(reverify_low_confidence())
         click.echo(f"  Low-confidence facts re-verified: {reverified}")
 
 
@@ -1391,6 +1412,90 @@ def mine_patterns(ctx: click.Context, min_projects: int, apply: bool) -> None:
         click.echo(f"Promoted {promoted} skills to global.")
 
 
+@cli.group()
+def backup() -> None:
+    """Create, inspect, and restore checked SQLite backups."""
+
+
+@backup.command("create")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.pass_context
+def backup_create(ctx: click.Context, output: str | None) -> None:
+    """Create a checked backup of live memory databases."""
+    from acrux.backup import BackupService
+
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    manifest = BackupService(cfg.data_dir, root).create()
+    click.echo(f"Created backup {manifest.id} at {manifest.path}")
+
+
+@backup.command("list")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.pass_context
+def backup_list(ctx: click.Context, output: str | None) -> None:
+    """List backups and their validation state."""
+    from acrux.backup import BackupService
+
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    infos = BackupService(cfg.data_dir, root).list()
+    if not infos:
+        click.echo("No backups found")
+        return
+    for info in infos:
+        state = "valid" if info.valid else "invalid"
+        click.echo(f"{info.id}\t{info.created_at}\t{info.project_count} projects\t{info.size} bytes\t{state}")
+
+
+@backup.command("restore")
+@click.argument("reference")
+@click.option("--output", default=None, type=click.Path(file_okay=False), help="Backup root directory.")
+@click.option("--yes", is_flag=True, help="Confirm restoration without prompting.")
+@click.pass_context
+def backup_restore(ctx: click.Context, reference: str, output: str | None, yes: bool) -> None:
+    """Validate and restore a backup after creating a safety backup."""
+    from acrux.backup import BackupError, BackupService
+
+    if PidFile(DAEMON_PID_FILE).is_running():
+        raise click.ClickException("Stop the Acrux daemon before restoring a backup")
+    if not yes and not click.confirm(f"Restore backup {reference}?"):
+        click.echo("Restore cancelled")
+        return
+    cfg = ctx.obj["config"]
+    root = Path(output) if output else cfg.backup_dir
+    try:
+        result = BackupService(cfg.data_dir, root).restore(reference)
+    except BackupError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Restored {result.backup_id}; safety backup {result.safety_backup_id}")
+
+
+@cli.command()
+@click.argument("batch_id", required=False)
+@click.option("--last", is_flag=True, help="Undo the newest completed batch.")
+@click.option("--project", required=True, help="Project that owns the batch.")
+@click.option("--yes", is_flag=True, help="Confirm restoration without prompting.")
+@click.pass_context
+def undo(ctx: click.Context, batch_id: str | None, last: bool, project: str, yes: bool) -> None:
+    """Restore exact before-images from a journaled mutation batch."""
+    from acrux.undo import UndoCoordinator, UndoError
+
+    if bool(batch_id) == last:
+        raise click.ClickException("Provide exactly one batch ID or --last")
+    target = batch_id or "latest completed batch"
+    if not yes and not click.confirm(f"Undo {target} for project {project}?"):
+        click.echo("Undo cancelled")
+        return
+    try:
+        result = UndoCoordinator(ctx.obj["config"].projects_dir / project).undo(
+            batch_id=batch_id, last=last
+        )
+    except UndoError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Undid batch {result.batch_id}: {result.restored_entries} entries restored")
+
+
 @cli.command()
 @click.argument("command", nargs=-1, required=True)
 @click.option("--project", default="default", help="Project to record the session under.")
@@ -1398,23 +1503,44 @@ def mine_patterns(ctx: click.Context, min_projects: int, apply: bool) -> None:
 @click.pass_context
 def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str | None) -> None:
     """Run a command and record it as an episode for learning."""
+    from acrux.capture import cap_text, normalize_error, redact_text
+
     cfg = ctx.obj["config"]
-    task = task or " ".join(command)
+    task = redact_text(task or " ".join(command))
     git_before = git_context(Path.cwd())
     start = time.time()
+    session_id = f"wrap-{int(start)}"
+    from acrux.provenance import WorktreeSnapshot
+
+    try:
+        snapshot = WorktreeSnapshot.capture(Path.cwd(), project, session_id)
+    except (OSError, subprocess.CalledProcessError):
+        snapshot = None
     proc = subprocess.run(command, capture_output=True, text=True)
     duration = time.time() - start
     outcome = "success" if proc.returncode == 0 else f"error (exit {proc.returncode})"
+    stdout, stdout_truncated = cap_text(redact_text(proc.stdout))
+    stderr, stderr_truncated = cap_text(redact_text(proc.stderr))
     actions = [
         Action(
             tool="run_command",
-            command=" ".join(command),
+            command=redact_text(" ".join(command)),
             result=outcome,
             diff="",
+            exit_code=proc.returncode,
+            stdout=stdout,
+            stderr=stderr,
+            error_signature=normalize_error(proc.returncode, stdout, stderr),
+            output_truncated=stdout_truncated or stderr_truncated,
         )
     ]
+    changes = snapshot.changes_since() if snapshot is not None else []
+    if changes:
+        semantic = SemanticStore(cfg.projects_dir / project / "semantic.db", embedder=None)
+        for change in changes:
+            semantic.add_code_change(change)
     episode = Episode(
-        session_id=f"wrap-{int(start)}",
+        session_id=session_id,
         task=task,
         project=project,
         context={"git_before": git_before, "duration_s": round(duration, 2)},

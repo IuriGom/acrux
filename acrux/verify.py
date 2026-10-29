@@ -7,11 +7,74 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Any
+
+import httpx
 
 from acrux.memory.episodic import EpisodicStore
 from acrux.memory.procedural_db import ProceduralDBStore
 from acrux.models import Skill
 from acrux.sandbox import run_sandboxed
+
+
+class OllamaFactVerifier:
+    def __init__(
+        self,
+        model: str,
+        host: str,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
+        self.model = model
+        self.host = host.rstrip("/")
+        self.client = httpx.AsyncClient(timeout=30.0, transport=transport)
+
+    async def verify_fact(self, content: str) -> str | None:
+        prompt = (
+            "You are a fact-checking assistant. Evaluate whether the following statement "
+            "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
+            f"Statement: {content}\n\nVerdict:"
+        )
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "keep_alive": "30s",
+            "options": {"num_ctx": 4096, "num_predict": 8},
+        }
+        try:
+            response = await self.client.post(f"{self.host}/api/generate", json=payload)
+            response.raise_for_status()
+            verdict = response.json().get("response", "").strip()
+        except Exception:
+            return None
+        normalized = verdict.casefold()
+        if normalized not in {"yes", "no", "uncertain"}:
+            return None
+        return normalized.capitalize()
+
+    async def reverify_project(self, semantic, project: str, limit: int) -> list[dict[str, Any]]:
+        results = []
+        try:
+            for fact in semantic.get_facts_for_reverify(project, limit=limit):
+                verdict = await self.verify_fact(fact.content) if fact.id else None
+                updated = semantic.record_verification(fact.id, verdict) if verdict else None
+                results.append(
+                    {
+                        "fact_id": fact.id,
+                        "content": fact.content,
+                        "verdict": verdict,
+                        "confidence": updated.confidence if updated else fact.confidence,
+                        "stale": updated.stale if updated else fact.stale,
+                    }
+                )
+            return results
+        finally:
+            await self.close()
+
+    async def close(self) -> None:
+        if not self.client.is_closed:
+            await self.client.aclose()
 
 
 class SkillVerifier:

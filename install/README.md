@@ -69,10 +69,23 @@ Environment overrides: `PIA_HOME`, `PIA_HOME`, `ACRUX_GH_REPO`,
 curl -fsSL https://acrux.dev/upgrade.sh | sh
 ```
 
-`upgrade.sh` stops the daemon, runs `uv pip install --upgrade` (latest GitHub
-release by default; `--channel main` or `--version X.Y.Z` to override),
-validates data with `acrux doctor`, and restarts the daemon. Your
-`~/.acrux/config.yaml` and all memory data are untouched.
+`upgrade.sh` stops the daemon, creates a checked backup with `acrux backup create`,
+runs `uv pip install --upgrade` (latest GitHub release by default; `--channel main`
+or `--version X.Y.Z` to override), validates data with `acrux doctor`, and restarts
+the daemon. A backup failure aborts the upgrade before installation. Your
+`~/.acrux/config.yaml` is untouched.
+
+Backup and recovery commands:
+
+```bash
+acrux backup create                 # create a checked SQLite backup
+acrux backup list                   # show IDs, sizes, and validation state
+acrux backup restore BACKUP_ID      # validate, create a safety backup, then restore
+```
+
+Restore requires the daemon to be stopped and asks for confirmation; use `--yes`
+for an explicit noninteractive confirmation. Backups default to `~/.acrux/backups`
+and exclude configuration, API tokens, logs, lock/PID files, and derived indexes.
 
 ## Uninstall
 

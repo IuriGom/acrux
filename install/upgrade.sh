@@ -6,9 +6,10 @@
 #
 # Flow (per docs/installation-plan.md):
 #   1. Stop the daemon (pid-file stop + user service).
-#   2. `uv pip install --upgrade` the acrux package into ~/.pia/venv.
-#   3. Run `acrux doctor` to validate data integrity.
-#   4. Restart the daemon via the user service (or directly).
+#   2. Create a checked pre-upgrade backup.
+#   3. `uv pip install --upgrade` the acrux package into ~/.pia/venv.
+#   4. Run `acrux doctor` to validate data integrity.
+#   5. Restart the daemon via the user service (or directly).
 #
 # The existing ~/.acrux/config.yaml (with its API token) is left untouched.
 # =============================================================================
@@ -216,9 +217,11 @@ start_daemon() {
 }
 
 # ---------------------------------------------------------------------------
-# Main flow: stop -> upgrade -> doctor -> restart.
+# Main flow: stop -> backup -> upgrade -> doctor -> restart.
 # ---------------------------------------------------------------------------
 stop_daemon
+log "Creating pre-upgrade backup ..."
+"$ACRUX_BIN" backup create || die "pre-upgrade backup failed"
 ensure_uv
 upgrade_package
 

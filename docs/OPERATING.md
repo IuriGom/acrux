@@ -112,7 +112,33 @@ acrux reflect --project foo       # Reflect on one project only
 acrux reflect --batch-size 5      # Smaller batches for weak hardware
 ```
 
-Reflection reads recent `episodes`, extracts `facts` and `skills`, and writes them back to `~/.acrux/data/`. It is the "self-training" step.
+Reflection reads recent `episodes`, extracts `facts` and `skills`, and writes them back to `~/.acrux/data/`. It is the "self-training" step. The scheduler skips projects without unreflected episodes, prevents overlapping jobs, and never performs automatic fact or skill re-verification. Ollama verification is explicit, bounded to 4K context and 8 output tokens with a 30-second timeout and keep-alive.
+
+### Evidence, undo, and recovery
+
+```bash
+acrux wrap --project myrepo -- pytest -q
+acrux ingest-git . --project myrepo [--max-commits 100]
+acrux undo --last --project myrepo
+acrux undo BATCH_ID --project myrepo --yes
+```
+
+`wrap` stores exit status, bounded/redacted stdout and stderr, an error signature, and only the diff introduced by that command—not pre-existing dirty-tree edits. `ingest-git` classifies commits deterministically and is idempotent; neither workflow requires an LLM. Redaction is best-effort, not a guarantee that every secret is detected.
+
+Durable mutations carry before/after journal images. An incomplete batch pauses new project mutations and logs a command like `acrux undo BATCH_ID --project myrepo`. Undo requires confirmation and restores exact rows, pending records, FTS, and vectors; it refuses to overwrite later conflicting changes.
+
+Fact re-verification is available only through explicit CLI/API requests such as `POST /api/acrux/reverify`; `acrux verify-skills` is the explicit skill-verification command.
+
+### Backup and restore
+
+```bash
+acrux backup create
+acrux backup list
+acrux stop
+acrux backup restore BACKUP_ID_OR_PATH [--yes]
+```
+
+Backups use SQLite snapshots with schema metadata and SHA-256 checksums. Restore validates every payload, creates a safety backup, and rolls back if replacement fails. Config, API tokens, logs, lock/PID files, and derived caches are excluded. The upgrade script stops the daemon and creates a backup before installing or migrating; a backup failure aborts the upgrade.
 
 ### Memory tools (used by Kimi Code via MCP)
 

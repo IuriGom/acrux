@@ -9,6 +9,7 @@ import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from acrux.memory.journal import mutation_scope, record_after, record_before
 from acrux.utils import utcnow
 from typing import Any
 
@@ -41,73 +42,73 @@ class FactStoreMixin:
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    async def add(self, fact: Fact) -> None:
+    async def add(self, fact: Fact, batch_id: str | None = None) -> None:
         if fact.confidence == 0:
             fact.confidence = fact.default_confidence()
         if not fact.checksum:
             fact.checksum = self._fact_checksum(fact)
-        with self._connect() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO facts
-                (project, content, source, tags, timestamp, confidence, verified_count,
-                 contradicted_count, stale, git_info, parent_id, version_group_id,
-                 is_current, fact_type, cluster_id, inheritance_mode, decay_score,
-                 last_recalled_at, checksum)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    fact.project,
-                    fact.content,
-                    fact.source,
-                    json.dumps(fact.tags),
-                    fact.timestamp,
-                    fact.confidence,
-                    fact.verified_count,
-                    fact.contradicted_count,
-                    1 if fact.stale else 0,
-                    json.dumps(fact.git_info) if fact.git_info is not None else None,
-                    fact.parent_id,
-                    fact.version_group_id,
-                    1 if fact.is_current else 0,
-                    fact.fact_type,
-                    fact.cluster_id,
-                    fact.inheritance_mode,
-                    fact.decay_score,
-                    fact.last_recalled_at,
-                    fact.checksum,
-                ),
-            )
-            fact_id = cursor.lastrowid
-            fact.id = fact_id
-            conn.execute(
-                "INSERT INTO facts_fts(rowid, content) VALUES (?, ?)",
-                (fact_id, fact.content),
-            )
-            if fact.version_group_id is None:
-                fact.version_group_id = fact_id
+        with mutation_scope(self, batch_id, "fact.add") as (journal, active_batch):
+            with self._connect() as conn:
+                fact_id = fact.id or conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM facts").fetchone()[0]
+                fact.id = fact_id
+                sequence = record_before(self, journal, active_batch, conn, "facts", "id", fact_id)
                 conn.execute(
-                    "UPDATE facts SET version_group_id = ? WHERE id = ?", (fact_id, fact_id)
+                    """
+                    INSERT INTO facts
+                    (id, project, content, source, tags, timestamp, confidence, verified_count,
+                     contradicted_count, stale, git_info, parent_id, version_group_id,
+                     is_current, fact_type, cluster_id, inheritance_mode, decay_score,
+                     last_recalled_at, checksum)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fact_id,
+                        fact.project,
+                        fact.content,
+                        fact.source,
+                        json.dumps(fact.tags),
+                        fact.timestamp,
+                        fact.confidence,
+                        fact.verified_count,
+                        fact.contradicted_count,
+                        1 if fact.stale else 0,
+                        json.dumps(fact.git_info) if fact.git_info is not None else None,
+                        fact.parent_id,
+                        fact.version_group_id or fact_id,
+                        1 if fact.is_current else 0,
+                        fact.fact_type,
+                        fact.cluster_id,
+                        fact.inheritance_mode,
+                        fact.decay_score,
+                        fact.last_recalled_at,
+                        fact.checksum,
+                    ),
                 )
-            conn.commit()
+                fact.version_group_id = fact.version_group_id or fact_id
+                conn.execute("INSERT INTO facts_fts(rowid, content) VALUES (?, ?)", (fact_id, fact.content))
+                conn.commit()
+                record_after(self, journal, conn, "facts", "id", fact_id, sequence)
 
-        if self.embedder:
-            try:
-                content_hash = self._content_hash(fact.content)
-                existing_vector = self._find_embedding_by_hash(content_hash)
-                if existing_vector is not None:
-                    vector = existing_vector
-                else:
-                    vector = await self.embedder.embed(fact.content)
-                with self._connect() as conn:
-                    conn.execute(
-                        "INSERT OR REPLACE INTO fact_embeddings (fact_id, content_hash, vector) VALUES (?, ?, ?)",
-                        (fact_id, content_hash, json.dumps(vector)),
-                    )
-                    conn.commit()
-                self.vector_index.add(fact_id, vector)
-            except Exception:
-                pass
+            if self.embedder:
+                try:
+                    content_hash = self._content_hash(fact.content)
+                    existing_vector = self._find_embedding_by_hash(content_hash)
+                    vector = existing_vector if existing_vector is not None else await self.embedder.embed(fact.content)
+                    with self._connect() as conn:
+                        embedding_sequence = record_before(
+                            self, journal, active_batch, conn, "fact_embeddings", "fact_id", fact_id
+                        )
+                        conn.execute(
+                            "INSERT OR REPLACE INTO fact_embeddings (fact_id, content_hash, vector) VALUES (?, ?, ?)",
+                            (fact_id, content_hash, json.dumps(vector)),
+                        )
+                        conn.commit()
+                        record_after(
+                            self, journal, conn, "fact_embeddings", "fact_id", fact_id, embedding_sequence
+                        )
+                    self.vector_index.add(fact_id, vector)
+                except Exception:
+                    pass
 
     def _find_embedding_by_hash(self, content_hash: str) -> list[float] | None:
         with self._connect() as conn:
@@ -138,13 +139,34 @@ class FactStoreMixin:
             ).fetchone()
         return self._row_to_fact(row) if row else None
 
-    def delete_by_id(self, fact_id: int) -> bool:
-        with self._connect() as conn:
-            cursor = conn.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
-            conn.execute("DELETE FROM fact_embeddings WHERE fact_id = ?", (fact_id,))
-            conn.execute("DELETE FROM fact_versions WHERE fact_id = ?", (fact_id,))
-            conn.execute("DELETE FROM facts_fts WHERE rowid = ?", (fact_id,))
-            conn.commit()
+    def delete_by_id(self, fact_id: int, batch_id: str | None = None) -> bool:
+        with mutation_scope(self, batch_id, "fact.delete") as (journal, active_batch):
+            with self._connect() as conn:
+                fact_sequence = record_before(self, journal, active_batch, conn, "facts", "id", fact_id)
+                embedding_sequence = record_before(
+                    self, journal, active_batch, conn, "fact_embeddings", "fact_id", fact_id
+                )
+                version_ids = [row[0] for row in conn.execute("SELECT id FROM fact_versions WHERE fact_id = ?", (fact_id,)).fetchall()]
+                version_sequences = {
+                    version_id: record_before(
+                        self, journal, active_batch, conn, "fact_versions", "id", version_id
+                    )
+                    for version_id in version_ids
+                }
+                fact_row = conn.execute("SELECT content FROM facts WHERE id = ?", (fact_id,)).fetchone()
+                cursor = conn.execute("DELETE FROM facts WHERE id = ?", (fact_id,))
+                conn.execute("DELETE FROM fact_embeddings WHERE fact_id = ?", (fact_id,))
+                conn.execute("DELETE FROM fact_versions WHERE fact_id = ?", (fact_id,))
+                if fact_row:
+                    conn.execute(
+                        "INSERT INTO facts_fts(facts_fts, rowid, content) VALUES ('delete', ?, ?)",
+                        (fact_id, fact_row[0]),
+                    )
+                conn.commit()
+                record_after(self, journal, conn, "facts", "id", fact_id, fact_sequence)
+                record_after(self, journal, conn, "fact_embeddings", "fact_id", fact_id, embedding_sequence)
+                for version_id, sequence in version_sequences.items():
+                    record_after(self, journal, conn, "fact_versions", "id", version_id, sequence)
         if cursor.rowcount > 0:
             self.vector_index.remove(fact_id)
             return True
@@ -158,109 +180,145 @@ class FactStoreMixin:
         parent_id: int | None = None,
         fact_type: str | None = None,
         inheritance_mode: str | None = None,
+        batch_id: str | None = None,
     ) -> Fact | None:
         existing = self.get_by_id(fact_id)
         if not existing:
             return None
 
-        changed = False
-        if content is not None and content != existing.content:
-            # Snapshot current version before overwriting
-            self._create_version(existing, "user")
-            existing.content = content
-            existing.timestamp = utcnow().isoformat()
-            existing.checksum = self._fact_checksum(existing)
-            changed = True
-            if self.embedder:
-                try:
-                    new_vector = await self.embedder.embed(existing.content)
-                    content_hash = self._content_hash(existing.content)
-                    with self._connect() as conn:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO fact_embeddings (fact_id, content_hash, vector) VALUES (?, ?, ?)",
-                            (fact_id, content_hash, json.dumps(new_vector)),
-                        )
-                        conn.commit()
-                    self.vector_index.add(fact_id, new_vector)
-                except Exception:
-                    pass
-        if tags is not None:
-            existing.tags = tags
-            changed = True
-        if parent_id is not None:
-            existing.parent_id = parent_id
-            changed = True
-        if fact_type is not None:
-            existing.fact_type = fact_type
-            changed = True
-        if inheritance_mode is not None:
-            existing.inheritance_mode = inheritance_mode
-            changed = True
+        with mutation_scope(self, batch_id, "fact.update") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "facts", "id", fact_id)
+            changed = False
+            if content is not None and content != existing.content:
+                self._create_version(existing, "user", batch_id=active_batch)
+                existing.content = content
+                existing.timestamp = utcnow().isoformat()
+                existing.checksum = self._fact_checksum(existing)
+                changed = True
+                if self.embedder:
+                    try:
+                        new_vector = await self.embedder.embed(existing.content)
+                        content_hash = self._content_hash(existing.content)
+                        with self._connect() as conn:
+                            embedding_sequence = record_before(
+                                self, journal, active_batch, conn, "fact_embeddings", "fact_id", fact_id
+                            )
+                            conn.execute(
+                                "INSERT OR REPLACE INTO fact_embeddings (fact_id, content_hash, vector) VALUES (?, ?, ?)",
+                                (fact_id, content_hash, json.dumps(new_vector)),
+                            )
+                            conn.commit()
+                            record_after(
+                                self, journal, conn, "fact_embeddings", "fact_id", fact_id, embedding_sequence
+                            )
+                        self.vector_index.add(fact_id, new_vector)
+                    except Exception:
+                        pass
+            if tags is not None:
+                existing.tags = tags
+                changed = True
+            if parent_id is not None:
+                existing.parent_id = parent_id
+                changed = True
+            if fact_type is not None:
+                existing.fact_type = fact_type
+                changed = True
+            if inheritance_mode is not None:
+                existing.inheritance_mode = inheritance_mode
+                changed = True
 
-        if changed:
-            existing.checksum = self._fact_checksum(existing)
-        with self._connect() as conn:
-            conn.execute(
-                """
-                UPDATE facts SET
-                    content = ?, source = ?, tags = ?, timestamp = ?, confidence = ?,
-                    verified_count = ?, contradicted_count = ?, stale = ?, git_info = ?,
-                    parent_id = ?, version_group_id = ?, is_current = ?, fact_type = ?,
-                    cluster_id = ?, inheritance_mode = ?, decay_score = ?, last_recalled_at = ?,
-                    checksum = ?
-                WHERE id = ?
-                """,
-                (
-                    existing.content,
-                    existing.source,
-                    json.dumps(existing.tags),
-                    existing.timestamp,
-                    existing.confidence,
-                    existing.verified_count,
-                    existing.contradicted_count,
-                    1 if existing.stale else 0,
-                    json.dumps(existing.git_info) if existing.git_info is not None else None,
-                    existing.parent_id,
-                    existing.version_group_id,
-                    1 if existing.is_current else 0,
-                    existing.fact_type,
-                    existing.cluster_id,
-                    existing.inheritance_mode,
-                    existing.decay_score,
-                    existing.last_recalled_at,
-                    existing.checksum,
-                    fact_id,
-                ),
-            )
-            conn.commit()
+            if changed:
+                existing.checksum = self._fact_checksum(existing)
+            with self._connect() as conn:
+                previous_content = conn.execute("SELECT content FROM facts WHERE id = ?", (fact_id,)).fetchone()[0]
+                conn.execute(
+                    """
+                    UPDATE facts SET
+                        content = ?, source = ?, tags = ?, timestamp = ?, confidence = ?,
+                        verified_count = ?, contradicted_count = ?, stale = ?, git_info = ?,
+                        parent_id = ?, version_group_id = ?, is_current = ?, fact_type = ?,
+                        cluster_id = ?, inheritance_mode = ?, decay_score = ?, last_recalled_at = ?,
+                        checksum = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        existing.content,
+                        existing.source,
+                        json.dumps(existing.tags),
+                        existing.timestamp,
+                        existing.confidence,
+                        existing.verified_count,
+                        existing.contradicted_count,
+                        1 if existing.stale else 0,
+                        json.dumps(existing.git_info) if existing.git_info is not None else None,
+                        existing.parent_id,
+                        existing.version_group_id,
+                        1 if existing.is_current else 0,
+                        existing.fact_type,
+                        existing.cluster_id,
+                        existing.inheritance_mode,
+                        existing.decay_score,
+                        existing.last_recalled_at,
+                        existing.checksum,
+                        fact_id,
+                    ),
+                )
+                conn.execute(
+                    "INSERT INTO facts_fts(facts_fts, rowid, content) VALUES ('delete', ?, ?)",
+                    (fact_id, previous_content),
+                )
+                conn.execute("INSERT INTO facts_fts(rowid, content) VALUES (?, ?)", (fact_id, existing.content))
+                conn.commit()
+                record_after(self, journal, conn, "facts", "id", fact_id, sequence)
         return existing
 
-    def _create_version(self, fact: Fact, edited_by: str = "reflection") -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO fact_versions (fact_id, content, tags, edited_at, edited_by)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    fact.id,
-                    fact.content,
-                    json.dumps(fact.tags),
-                    fact.timestamp or utcnow().isoformat(),
-                    edited_by,
-                ),
-            )
-            # Cap versions per fact
-            conn.execute(
-                """
-                DELETE FROM fact_versions
-                WHERE id NOT IN (
-                    SELECT id FROM fact_versions WHERE fact_id = ? ORDER BY edited_at DESC LIMIT 50
-                ) AND fact_id = ?
-                """,
-                (fact.id, fact.id),
-            )
-            conn.commit()
+    def _create_version(self, fact: Fact, edited_by: str = "reflection", batch_id: str | None = None) -> None:
+        with mutation_scope(self, batch_id, "fact.create_version") as (journal, active_batch):
+            with self._connect() as conn:
+                version_id = conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM fact_versions").fetchone()[0]
+                sequence = record_before(self, journal, active_batch, conn, "fact_versions", "id", version_id)
+                conn.execute(
+                    """
+                    INSERT INTO fact_versions (id, fact_id, content, tags, edited_at, edited_by)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        version_id,
+                        fact.id,
+                        fact.content,
+                        json.dumps(fact.tags),
+                        fact.timestamp or utcnow().isoformat(),
+                        edited_by,
+                    ),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "fact_versions", "id", version_id, sequence)
+                expired_ids = [
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT id FROM fact_versions WHERE fact_id = ? AND id NOT IN (SELECT id FROM fact_versions WHERE fact_id = ? ORDER BY edited_at DESC LIMIT 50)",
+                        (fact.id, fact.id),
+                    ).fetchall()
+                ]
+                expired_sequences = {
+                    expired_id: record_before(
+                        self, journal, active_batch, conn, "fact_versions", "id", expired_id
+                    )
+                    for expired_id in expired_ids
+                }
+                conn.execute(
+                    """
+                    DELETE FROM fact_versions
+                    WHERE id NOT IN (
+                        SELECT id FROM fact_versions WHERE fact_id = ? ORDER BY edited_at DESC LIMIT 50
+                    ) AND fact_id = ?
+                    """,
+                    (fact.id, fact.id),
+                )
+                conn.commit()
+                for expired_id, expired_sequence in expired_sequences.items():
+                    record_after(self, journal, conn, "fact_versions", "id", expired_id, expired_sequence)
 
     def get_versions(self, fact_id: int) -> list[dict[str, Any]]:
         with self._connect() as conn:
@@ -617,32 +675,34 @@ class FactStoreMixin:
         )
         return [self._row_to_fact(row) for row in rows]
 
-    def record_verification(self, fact_id: int, verdict: str) -> Fact | None:
+    def record_verification(self, fact_id: int, verdict: str, batch_id: str | None = None) -> Fact | None:
         fact = self.get_by_id(fact_id)
         if not fact:
             return None
         verdict_lower = verdict.lower()
         if verdict_lower == "yes":
             fact.verified_count += 1
-            # A fresh confirmation rehabilitates a stale fact.
             fact.stale = False
         elif verdict_lower == "no":
             fact.contradicted_count += 1
         elif verdict_lower == "uncertain":
             fact.stale = True
         fact.update_confidence()
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE facts SET verified_count = ?, contradicted_count = ?, confidence = ?, stale = ? WHERE id = ?",
-                (
-                    fact.verified_count,
-                    fact.contradicted_count,
-                    fact.confidence,
-                    1 if fact.stale else 0,
-                    fact_id,
-                ),
-            )
-            conn.commit()
+        with mutation_scope(self, batch_id, "fact.record_verification") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "facts", "id", fact_id)
+                conn.execute(
+                    "UPDATE facts SET verified_count = ?, contradicted_count = ?, confidence = ?, stale = ? WHERE id = ?",
+                    (
+                        fact.verified_count,
+                        fact.contradicted_count,
+                        fact.confidence,
+                        1 if fact.stale else 0,
+                        fact_id,
+                    ),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "facts", "id", fact_id, sequence)
         return fact
 
     def record_conflict(self, fact_id: int) -> Fact | None:
@@ -720,32 +780,38 @@ class FactStoreMixin:
                 """
             )
 
-    def add_pending_fact(self, fact: Fact) -> int:
+    def add_pending_fact(self, fact: Fact, batch_id: str | None = None) -> int:
         self._ensure_pending_facts_table()
-        with self._connect() as conn:
-            cur = conn.execute(
-                """
-                INSERT INTO pending_facts
-                (project, content, source, tags, timestamp, confidence, verified_count, contradicted_count, stale, git_info, fact_type, cluster_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    fact.project,
-                    fact.content,
-                    fact.source,
-                    json.dumps(fact.tags),
-                    fact.timestamp,
-                    fact.confidence,
-                    fact.verified_count,
-                    fact.contradicted_count,
-                    1 if fact.stale else 0,
-                    json.dumps(fact.git_info) if fact.git_info else None,
-                    fact.fact_type,
-                    fact.cluster_id,
-                ),
-            )
-            conn.commit()
-            return cur.lastrowid
+        with mutation_scope(self, batch_id, "fact.add_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                pending_id = fact.id or conn.execute("SELECT COALESCE(MAX(id), 0) + 1 FROM pending_facts").fetchone()[0]
+                fact.id = pending_id
+                sequence = record_before(self, journal, active_batch, conn, "pending_facts", "id", pending_id)
+                conn.execute(
+                    """
+                    INSERT INTO pending_facts
+                    (id, project, content, source, tags, timestamp, confidence, verified_count, contradicted_count, stale, git_info, fact_type, cluster_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pending_id,
+                        fact.project,
+                        fact.content,
+                        fact.source,
+                        json.dumps(fact.tags),
+                        fact.timestamp,
+                        fact.confidence,
+                        fact.verified_count,
+                        fact.contradicted_count,
+                        1 if fact.stale else 0,
+                        json.dumps(fact.git_info) if fact.git_info else None,
+                        fact.fact_type,
+                        fact.cluster_id,
+                    ),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "pending_facts", "id", pending_id, sequence)
+                return pending_id
 
     def list_pending_facts(self, project: str, limit: int = 100) -> list[Fact]:
         self._ensure_pending_facts_table()
@@ -757,27 +823,33 @@ class FactStoreMixin:
             ).fetchall()
         return [self._row_to_fact(row) for row in rows]
 
-    def promote_pending_fact(self, pending_id: int) -> bool:
+    def promote_pending_fact(self, pending_id: int, batch_id: str | None = None) -> bool:
         self._ensure_pending_facts_table()
-        with self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM pending_facts WHERE id = ?", (pending_id,)
-            ).fetchone()
-            if not row:
-                return False
-            fact = self._row_to_fact(row)
-            self.add(fact)
-            conn.execute("DELETE FROM pending_facts WHERE id = ?", (pending_id,))
-            conn.commit()
-            return True
+        with mutation_scope(self, batch_id, "fact.promote_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                conn.row_factory = sqlite3.Row
+                row = conn.execute("SELECT * FROM pending_facts WHERE id = ?", (pending_id,)).fetchone()
+                if not row:
+                    return False
+                sequence = record_before(self, journal, active_batch, conn, "pending_facts", "id", pending_id)
+                fact = self._row_to_fact(row)
+                import asyncio
 
-    def reject_pending_fact(self, pending_id: int) -> bool:
+                asyncio.run(self.add(fact, batch_id=active_batch))
+                conn.execute("DELETE FROM pending_facts WHERE id = ?", (pending_id,))
+                conn.commit()
+                record_after(self, journal, conn, "pending_facts", "id", pending_id, sequence)
+                return True
+
+    def reject_pending_fact(self, pending_id: int, batch_id: str | None = None) -> bool:
         self._ensure_pending_facts_table()
-        with self._connect() as conn:
-            cur = conn.execute("DELETE FROM pending_facts WHERE id = ?", (pending_id,))
-            conn.commit()
-            return cur.rowcount > 0
+        with mutation_scope(self, batch_id, "fact.reject_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "pending_facts", "id", pending_id)
+                cur = conn.execute("DELETE FROM pending_facts WHERE id = ?", (pending_id,))
+                conn.commit()
+                record_after(self, journal, conn, "pending_facts", "id", pending_id, sequence)
+                return cur.rowcount > 0
 
     # ------------------------------------------------------------------
     # Metrics

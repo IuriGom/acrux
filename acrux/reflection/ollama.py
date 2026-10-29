@@ -81,6 +81,7 @@ class OllamaProvider(ReflectionProvider):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": "30s",
             # Disable reasoning-mode: thinking tokens count against num_predict,
             # and when the trace is long the actual response comes back EMPTY,
             # which silently yielded "+0 facts" reflections. The /no_think prompt
@@ -95,6 +96,9 @@ class OllamaProvider(ReflectionProvider):
         response.raise_for_status()
         data = response.json()
         return data.get("response", "").strip()
+
+    async def close(self) -> None:
+        await self.client.aclose()
 
     def _parse_facts_json(
         self, text: str, episodes: list[Episode], source_override: str | None = None

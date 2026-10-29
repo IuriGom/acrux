@@ -30,6 +30,8 @@ class AcruxDaemon:
         self.logger = get_logger()
         self.kimi_watcher = KimiSessionWatcher(config)
         self.claude_watcher = ClaudeSessionWatcher(config)
+        self._reflection_running = False
+        self._active_reflection_projects: set[str] = set()
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
@@ -39,6 +41,7 @@ class AcruxDaemon:
         pid_file = PidFile(DAEMON_PID_FILE)
         pid_file.write(os.getpid())
         self.logger.info("Starting acrux daemon (transport=%s)", self.config.mcp.transport)
+        self._warn_incomplete_batches()
         server_task = asyncio.create_task(self._run_server())
         scheduler_task = asyncio.create_task(self._run_scheduler())
         # NOTE: the daemon deliberately does NOT serve the app API (port 11438).
@@ -64,6 +67,26 @@ class AcruxDaemon:
 
     def _request_stop(self) -> None:
         self.stop_event.set()
+
+    def _warn_incomplete_batches(self) -> None:
+        from acrux.memory.journal import MutationJournal
+
+        if not self.config.projects_dir.exists():
+            return
+        for project_dir in self.config.projects_dir.iterdir():
+            if not project_dir.is_dir() or project_dir.name.startswith("_"):
+                continue
+            for batch in MutationJournal(project_dir).incomplete():
+                self.logger.warning(
+                    "Incomplete mutation batch %s for %s (created %s, last sequence %d); "
+                    "new mutations paused. Recover with: acrux undo %s --project %s",
+                    batch.id,
+                    batch.project,
+                    batch.created_at,
+                    batch.last_sequence,
+                    batch.id,
+                    batch.project,
+                )
 
     async def _run_server(self) -> None:
         if self.config.mcp.transport == "http":
@@ -128,89 +151,72 @@ class AcruxDaemon:
             itr = croniter("0 2 * * *", utcnow())
             return itr.get_next(datetime)
 
+    def _eligible_projects(self) -> list[str]:
+        if not self.config.projects_dir.exists():
+            return []
+        eligible = []
+        for project_dir in self.config.projects_dir.iterdir():
+            if not project_dir.is_dir() or project_dir.name.startswith("_"):
+                continue
+            episodic = EpisodicStore(project_dir / "episodes.db")
+            if episodic.count_unreflected(project_dir.name) > 0:
+                eligible.append(project_dir.name)
+        return eligible
+
     async def _run_reflection(self) -> None:
+        if self._reflection_running:
+            self.logger.info("Scheduled reflection already running; skipping overlapping run")
+            return
+        self._reflection_running = True
         self.logger.info("Running scheduled reflection")
         try:
-            from acrux.verify import SkillVerifier
-
-            for project_dir in self.config.projects_dir.iterdir():
-                if not project_dir.is_dir() or project_dir.name.startswith("_"):
+            for project in self._eligible_projects():
+                if project in self._active_reflection_projects:
+                    self.logger.info("Reflection already running for %s; skipping", project)
                     continue
-                episodic = EpisodicStore(project_dir / "episodes.db")
-                semantic = SemanticStore(
-                    project_dir / "semantic.db", embedder=self.config.create_embedder()
-                )
-                procedural = ProceduralDBStore(project_dir / "skills.db")
-                engine = ReflectionEngine(self.config, episodic, semantic, procedural)
-                result = await engine.reflect_project(project_dir.name)
-                self.logger.info(
-                    "Reflected project %s: +%d facts, +%d skills",
-                    project_dir.name,
-                    result["facts"],
-                    result["skills"],
-                )
-                verify_results = await SkillVerifier(episodic, procedural).verify_project(project_dir.name)
-                verified = sum(1 for errs in verify_results.values() if not errs)
-                if verified:
-                    self.logger.info(
-                        "Verified %d skills for project %s", verified, project_dir.name
+                self._active_reflection_projects.add(project)
+                project_dir = self.config.projects_dir / project
+                try:
+                    episodic = EpisodicStore(project_dir / "episodes.db")
+                    semantic = SemanticStore(
+                        project_dir / "semantic.db", embedder=self.config.create_embedder()
                     )
-                await self._run_reverify(project_dir.name)
-        except Exception as exc:
-            self.logger.exception("Scheduled reflection failed: %s", exc)
+                    procedural = ProceduralDBStore(project_dir / "skills.db")
+                    engine = ReflectionEngine(self.config, episodic, semantic, procedural)
+                    try:
+                        result = await engine.reflect_project(project)
+                        self.logger.info(
+                            "Reflected project %s: +%d facts, +%d skills",
+                            project,
+                            result["facts"],
+                            result["skills"],
+                        )
+                    finally:
+                        await engine.close()
+                except Exception as exc:
+                    self.logger.exception("Scheduled reflection failed for %s: %s", project, exc)
+                finally:
+                    self._active_reflection_projects.discard(project)
+        finally:
+            self._reflection_running = False
 
     async def _run_reverify(self, project: str) -> None:
         if self.config.reflection.provider != "ollama":
             return
-        self.logger.info("Running scheduled re-verification for %s", project)
-        try:
-            semantic = SemanticStore(
-                self.config.projects_dir / project / "semantic.db",
-                embedder=self.config.create_embedder(),
-            )
-            model = self.config.reflection.routing.get("reflection", self.config.reflection.model)
-            import httpx
+        from acrux.verify import OllamaFactVerifier
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                # Promote pending facts after verification
-                pending = semantic.list_pending_facts(project, limit=20)
-                for fact in pending:
-                    verdict = await self._verify_fact(client, model, fact.content)
-                    if verdict == "Yes":
-                        semantic.promote_pending_fact(fact.id)
-                        self.logger.info("Promoted pending fact %s", fact.id)
-                    elif verdict == "No":
-                        semantic.reject_pending_fact(fact.id)
-                        self.logger.info("Rejected pending fact %s", fact.id)
-
-                # Re-verify low-confidence live facts
-                facts = semantic.get_facts_for_reverify(project, limit=10)
-                for fact in facts:
-                    if not fact.id:
-                        continue
-                    verdict = await self._verify_fact(client, model, fact.content)
-                    if verdict:
-                        semantic.record_verification(fact.id, verdict)
-                        self.logger.info("Reverified fact %s: %s", fact.id, verdict)
-        except Exception as exc:
-            self.logger.exception("Scheduled re-verification failed for %s: %s", project, exc)
-
-    async def _verify_fact(self, client, model: str, content: str) -> str | None:
-        prompt = (
-            "You are a fact-checking assistant. Evaluate whether the following statement "
-            "is still true. Answer with exactly one word: Yes, No, or Uncertain.\n\n"
-            f"Statement: {content}\n\nVerdict:"
+        self.logger.info("Running explicit re-verification for %s", project)
+        semantic = SemanticStore(
+            self.config.projects_dir / project / "semantic.db", embedder=None
         )
-        try:
-            r = await client.post(
-                f"{self.config.reflection.host}/api/generate",
-                json={"model": model, "prompt": prompt, "stream": False},
-            )
-            r.raise_for_status()
-            return r.json().get("response", "Uncertain").strip().split()[0]
-        except Exception as exc:
-            self.logger.warning("Fact verification failed: %s", exc)
-            return None
+        model = self.config.reflection.routing.get("reflection", self.config.reflection.model)
+        verifier = OllamaFactVerifier(model, self.config.reflection.host)
+        results = await verifier.reverify_project(semantic, project, limit=10)
+        for result in results:
+            if result["verdict"]:
+                self.logger.info(
+                    "Reverified fact %s: %s", result["fact_id"], result["verdict"]
+                )
 
 
 async def run_daemon(config: AcruxConfig) -> None:

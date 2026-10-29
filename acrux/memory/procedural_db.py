@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from acrux.memory.journal import mutation_scope, record_after, record_before
 from acrux.models import Skill
 
 
@@ -105,57 +106,77 @@ class ProceduralDBStore:
             risk=row["risk"] or "unknown",
         )
 
-    def add(self, skill: Skill) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO skills
-                (id, project, name, preconditions, procedure, evidence, success_rate, verified, tags, timestamp, parameters, composition, precondition_checks, cost, risk)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(project, name) DO UPDATE SET
-                    id=excluded.id,
-                    preconditions=excluded.preconditions,
-                    procedure=excluded.procedure,
-                    evidence=excluded.evidence,
-                    success_rate=excluded.success_rate,
-                    verified=excluded.verified,
-                    tags=excluded.tags,
-                    timestamp=excluded.timestamp,
-                    parameters=excluded.parameters,
-                    composition=excluded.composition,
-                    precondition_checks=excluded.precondition_checks,
-                    cost=excluded.cost,
-                    risk=excluded.risk
-                """,
-                (
-                    skill.id,
-                    skill.project,
-                    skill.name,
-                    json.dumps(skill.preconditions),
-                    json.dumps(skill.procedure),
-                    json.dumps(skill.evidence),
-                    skill.success_rate,
-                    int(skill.verified),
-                    json.dumps(skill.tags),
-                    skill.timestamp,
-                    json.dumps(skill.parameters),
-                    json.dumps(skill.composition),
-                    json.dumps(skill.precondition_checks),
-                    skill.cost,
-                    skill.risk,
-                ),
-            )
-            rowid = conn.execute("SELECT rowid FROM skills WHERE id = ?", (skill.id,)).fetchone()[0]
-            conn.execute(
-                "INSERT INTO skills_fts(rowid, name, preconditions, procedure, tags) VALUES (?, ?, ?, ?, ?)",
-                (
-                    rowid,
-                    skill.name,
-                    " ".join(skill.preconditions),
-                    " ".join(skill.procedure),
-                    " ".join(skill.tags),
-                ),
-            )
+    def add(self, skill: Skill, batch_id: str | None = None) -> None:
+        with mutation_scope(self, batch_id, "skill.add") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "skills", "id", skill.id)
+                existing = conn.execute(
+                    "SELECT * FROM skills WHERE project = ? AND name = ?",
+                    (skill.project, skill.name),
+                ).fetchone()
+                replaced_sequence = None
+                if existing and existing["id"] != skill.id:
+                    replaced_sequence = record_before(
+                        self, journal, active_batch, conn, "skills", "id", existing["id"]
+                    )
+                conn.execute(
+                    """
+                    INSERT INTO skills
+                    (id, project, name, preconditions, procedure, evidence, success_rate, verified, tags, timestamp, parameters, composition, precondition_checks, cost, risk)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(project, name) DO UPDATE SET
+                        id=excluded.id,
+                        preconditions=excluded.preconditions,
+                        procedure=excluded.procedure,
+                        evidence=excluded.evidence,
+                        success_rate=excluded.success_rate,
+                        verified=excluded.verified,
+                        tags=excluded.tags,
+                        timestamp=excluded.timestamp,
+                        parameters=excluded.parameters,
+                        composition=excluded.composition,
+                        precondition_checks=excluded.precondition_checks,
+                        cost=excluded.cost,
+                        risk=excluded.risk
+                    """,
+                    (
+                        skill.id,
+                        skill.project,
+                        skill.name,
+                        json.dumps(skill.preconditions),
+                        json.dumps(skill.procedure),
+                        json.dumps(skill.evidence),
+                        skill.success_rate,
+                        int(skill.verified),
+                        json.dumps(skill.tags),
+                        skill.timestamp,
+                        json.dumps(skill.parameters),
+                        json.dumps(skill.composition),
+                        json.dumps(skill.precondition_checks),
+                        skill.cost,
+                        skill.risk,
+                    ),
+                )
+                rowid = conn.execute("SELECT rowid FROM skills WHERE id = ?", (skill.id,)).fetchone()[0]
+                if existing:
+                    conn.execute(
+                        "INSERT INTO skills_fts(skills_fts, rowid, name, preconditions, procedure, tags) VALUES ('delete', ?, ?, ?, ?, ?)",
+                        (rowid, existing["name"], existing["preconditions"], existing["procedure"], existing["tags"]),
+                    )
+                conn.execute(
+                    "INSERT INTO skills_fts(rowid, name, preconditions, procedure, tags) VALUES (?, ?, ?, ?, ?)",
+                    (
+                        rowid,
+                        skill.name,
+                        " ".join(skill.preconditions),
+                        " ".join(skill.procedure),
+                        " ".join(skill.tags),
+                    ),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "skills", "id", skill.id, sequence)
+                if replaced_sequence is not None:
+                    record_after(self, journal, conn, "skills", "id", existing["id"], replaced_sequence)
 
     def get_all(self, project: str | None = None) -> list[Skill]:
         with self._connect() as conn:
@@ -175,13 +196,20 @@ class ProceduralDBStore:
             ).fetchall()
         return [self._row_to_skill(r) for r in rows]
 
-    def delete_by_id(self, skill_id: str) -> bool:
-        with self._connect() as conn:
-            row = conn.execute("SELECT rowid FROM skills WHERE id = ?", (skill_id,)).fetchone()
-            if row:
-                conn.execute("DELETE FROM skills_fts WHERE rowid = ?", (row[0],))
-            cur = conn.execute("DELETE FROM skills WHERE id = ?", (skill_id,))
-            return cur.rowcount > 0
+    def delete_by_id(self, skill_id: str, batch_id: str | None = None) -> bool:
+        with mutation_scope(self, batch_id, "skill.delete") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "skills", "id", skill_id)
+                row = conn.execute("SELECT rowid AS skill_rowid, * FROM skills WHERE id = ?", (skill_id,)).fetchone()
+                if row:
+                    conn.execute(
+                        "INSERT INTO skills_fts(skills_fts, rowid, name, preconditions, procedure, tags) VALUES ('delete', ?, ?, ?, ?, ?)",
+                        (row["skill_rowid"], row["name"], row["preconditions"], row["procedure"], row["tags"]),
+                    )
+                cur = conn.execute("DELETE FROM skills WHERE id = ?", (skill_id,))
+                conn.commit()
+                record_after(self, journal, conn, "skills", "id", skill_id, sequence)
+                return cur.rowcount > 0
 
     def search_fts(self, project: str, query: str, limit: int = 20) -> list[Skill]:
         """Full-text search with BM25 ranking via FTS5."""
@@ -229,34 +257,49 @@ class ProceduralDBStore:
             row = conn.execute("SELECT * FROM skills WHERE id = ?", (skill_id,)).fetchone()
         return self._row_to_skill(row) if row else None
 
-    def update(self, skill: Skill) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                UPDATE skills SET
-                    project = ?, name = ?, preconditions = ?, procedure = ?,
-                    evidence = ?, success_rate = ?, verified = ?, tags = ?, timestamp = ?,
-                    parameters = ?, composition = ?, precondition_checks = ?, cost = ?, risk = ?
-                WHERE id = ?
-                """,
-                (
-                    skill.project,
-                    skill.name,
-                    json.dumps(skill.preconditions),
-                    json.dumps(skill.procedure),
-                    json.dumps(skill.evidence),
-                    skill.success_rate,
-                    int(skill.verified),
-                    json.dumps(skill.tags),
-                    skill.timestamp,
-                    json.dumps(skill.parameters),
-                    json.dumps(skill.composition),
-                    json.dumps(skill.precondition_checks),
-                    skill.cost,
-                    skill.risk,
-                    skill.id,
-                ),
-            )
+    def update(self, skill: Skill, batch_id: str | None = None) -> None:
+        with mutation_scope(self, batch_id, "skill.update") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "skills", "id", skill.id)
+                existing = conn.execute("SELECT * FROM skills WHERE id = ?", (skill.id,)).fetchone()
+                conn.execute(
+                    """
+                    UPDATE skills SET
+                        project = ?, name = ?, preconditions = ?, procedure = ?,
+                        evidence = ?, success_rate = ?, verified = ?, tags = ?, timestamp = ?,
+                        parameters = ?, composition = ?, precondition_checks = ?, cost = ?, risk = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        skill.project,
+                        skill.name,
+                        json.dumps(skill.preconditions),
+                        json.dumps(skill.procedure),
+                        json.dumps(skill.evidence),
+                        skill.success_rate,
+                        int(skill.verified),
+                        json.dumps(skill.tags),
+                        skill.timestamp,
+                        json.dumps(skill.parameters),
+                        json.dumps(skill.composition),
+                        json.dumps(skill.precondition_checks),
+                        skill.cost,
+                        skill.risk,
+                        skill.id,
+                    ),
+                )
+                rowid = conn.execute("SELECT rowid FROM skills WHERE id = ?", (skill.id,)).fetchone()[0]
+                if existing:
+                    conn.execute(
+                        "INSERT INTO skills_fts(skills_fts, rowid, name, preconditions, procedure, tags) VALUES ('delete', ?, ?, ?, ?, ?)",
+                        (rowid, existing["name"], existing["preconditions"], existing["procedure"], existing["tags"]),
+                    )
+                conn.execute(
+                    "INSERT INTO skills_fts(rowid, name, preconditions, procedure, tags) VALUES (?, ?, ?, ?, ?)",
+                    (rowid, skill.name, " ".join(skill.preconditions), " ".join(skill.procedure), " ".join(skill.tags)),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "skills", "id", skill.id, sequence)
 
     def update_success(self, skill_id: str, success: bool = True) -> None:
         skill = self.get_by_id(skill_id)
@@ -332,33 +375,37 @@ class ProceduralDBStore:
                 """
             )
 
-    def add_pending(self, skill: Skill) -> None:
+    def add_pending(self, skill: Skill, batch_id: str | None = None) -> None:
         self._ensure_pending_table()
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO pending_skills
-                (id, project, name, preconditions, procedure, evidence, success_rate, verified, tags, timestamp, parameters, composition, precondition_checks, cost, risk)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    skill.id,
-                    skill.project,
-                    skill.name,
-                    json.dumps(skill.preconditions),
-                    json.dumps(skill.procedure),
-                    json.dumps(skill.evidence),
-                    skill.success_rate,
-                    int(skill.verified),
-                    json.dumps(skill.tags),
-                    skill.timestamp,
-                    json.dumps(skill.parameters),
-                    json.dumps(skill.composition),
-                    json.dumps(skill.precondition_checks),
-                    skill.cost,
-                    skill.risk,
-                ),
-            )
+        with mutation_scope(self, batch_id, "skill.add_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(self, journal, active_batch, conn, "pending_skills", "id", skill.id)
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pending_skills
+                    (id, project, name, preconditions, procedure, evidence, success_rate, verified, tags, timestamp, parameters, composition, precondition_checks, cost, risk)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        skill.id,
+                        skill.project,
+                        skill.name,
+                        json.dumps(skill.preconditions),
+                        json.dumps(skill.procedure),
+                        json.dumps(skill.evidence),
+                        skill.success_rate,
+                        int(skill.verified),
+                        json.dumps(skill.tags),
+                        skill.timestamp,
+                        json.dumps(skill.parameters),
+                        json.dumps(skill.composition),
+                        json.dumps(skill.precondition_checks),
+                        skill.cost,
+                        skill.risk,
+                    ),
+                )
+                conn.commit()
+                record_after(self, journal, conn, "pending_skills", "id", skill.id, sequence)
 
     def list_pending(self, project: str | None = None) -> list[Skill]:
         self._ensure_pending_table()
@@ -374,21 +421,31 @@ class ProceduralDBStore:
                 ).fetchall()
         return [self._row_to_skill(r) for r in rows]
 
-    def promote_pending(self, skill_id: str) -> bool:
+    def promote_pending(self, skill_id: str, batch_id: str | None = None) -> bool:
         self._ensure_pending_table()
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM pending_skills WHERE id = ?", (skill_id,)
-            ).fetchone()
-            if not row:
-                return False
-            skill = self._row_to_skill(row)
-            self.add(skill)
-            conn.execute("DELETE FROM pending_skills WHERE id = ?", (skill_id,))
-            return True
+        with mutation_scope(self, batch_id, "skill.promote_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                row = conn.execute("SELECT * FROM pending_skills WHERE id = ?", (skill_id,)).fetchone()
+                if not row:
+                    return False
+                sequence = record_before(
+                    self, journal, active_batch, conn, "pending_skills", "id", skill_id
+                )
+                skill = self._row_to_skill(row)
+                self.add(skill, batch_id=active_batch)
+                conn.execute("DELETE FROM pending_skills WHERE id = ?", (skill_id,))
+                conn.commit()
+                record_after(self, journal, conn, "pending_skills", "id", skill_id, sequence)
+                return True
 
-    def reject_pending(self, skill_id: str) -> bool:
+    def reject_pending(self, skill_id: str, batch_id: str | None = None) -> bool:
         self._ensure_pending_table()
-        with self._connect() as conn:
-            cur = conn.execute("DELETE FROM pending_skills WHERE id = ?", (skill_id,))
-            return cur.rowcount > 0
+        with mutation_scope(self, batch_id, "skill.reject_pending") as (journal, active_batch):
+            with self._connect() as conn:
+                sequence = record_before(
+                    self, journal, active_batch, conn, "pending_skills", "id", skill_id
+                )
+                cur = conn.execute("DELETE FROM pending_skills WHERE id = ?", (skill_id,))
+                conn.commit()
+                record_after(self, journal, conn, "pending_skills", "id", skill_id, sequence)
+                return cur.rowcount > 0

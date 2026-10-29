@@ -25,6 +25,7 @@ from acrux.memory.artifacts import ArtifactsStoreMixin
 from acrux.memory.facts import FactStoreMixin
 from acrux.memory.graph import GraphStoreMixin
 from acrux.memory.health import HealthStoreMixin
+from acrux.memory.provenance import ProvenanceStoreMixin
 
 try:
     from acrux.vector_sqlite import SqliteVecIndex as VectorIndex
@@ -39,6 +40,7 @@ SCHEMA_VERSION = 1
 
 
 class SemanticStore(
+    ProvenanceStoreMixin,
     FactStoreMixin,
     GraphStoreMixin,
     ArtifactsStoreMixin,
@@ -61,6 +63,10 @@ class SemanticStore(
             vector_index = VectorIndex.load_or_init(index_path, self.dim, enabled=enabled)
         self.vector_index = vector_index
         self._rebuild_vector_index()
+
+    async def close(self) -> None:
+        if self.embedder is not None:
+            await self.embedder.close()
 
     def _connect(self) -> sqlite3.Connection:
         """Open a connection to this store's single SQLite database.
@@ -321,6 +327,7 @@ class SemanticStore(
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_health_resolved ON health_checks(resolved_at)"
             )
+            self._init_code_changes(conn)
             # Keep PRAGMA user_version for future migrations: only raise it,
             # never downgrade a database already migrated to a newer version.
             current_version = conn.execute("PRAGMA user_version").fetchone()[0]
