@@ -42,10 +42,14 @@ def test_failed_replacement_rolls_back_to_safety_backup(tmp_path, monkeypatch):
     manifest = service.create()
     episodic.add(Episode(session_id="later", task="later", project="demo"))
     replace = service._replace_payload
+    calls = 0
 
     def fail_after_replace(staging, data):
+        nonlocal calls
+        calls += 1
         replace(staging, data)
-        raise BackupError("simulated replacement failure")
+        if calls == 1:
+            raise BackupError("simulated replacement failure")
 
     monkeypatch.setattr(service, "_replace_payload", fail_after_replace)
     with pytest.raises(BackupError, match="simulated"):

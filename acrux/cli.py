@@ -1503,8 +1503,10 @@ def undo(ctx: click.Context, batch_id: str | None, last: bool, project: str, yes
 @click.pass_context
 def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str | None) -> None:
     """Run a command and record it as an episode for learning."""
+    from acrux.capture import cap_text, normalize_error, redact_text
+
     cfg = ctx.obj["config"]
-    task = task or " ".join(command)
+    task = redact_text(task or " ".join(command))
     git_before = git_context(Path.cwd())
     start = time.time()
     session_id = f"wrap-{int(start)}"
@@ -1517,14 +1519,12 @@ def wrap(ctx: click.Context, command: tuple[str, ...], project: str, task: str |
     proc = subprocess.run(command, capture_output=True, text=True)
     duration = time.time() - start
     outcome = "success" if proc.returncode == 0 else f"error (exit {proc.returncode})"
-    from acrux.capture import cap_text, normalize_error, redact_text
-
     stdout, stdout_truncated = cap_text(redact_text(proc.stdout))
     stderr, stderr_truncated = cap_text(redact_text(proc.stderr))
     actions = [
         Action(
             tool="run_command",
-            command=" ".join(command),
+            command=redact_text(" ".join(command)),
             result=outcome,
             diff="",
             exit_code=proc.returncode,

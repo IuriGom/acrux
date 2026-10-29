@@ -110,7 +110,15 @@ class ProceduralDBStore:
         with mutation_scope(self, batch_id, "skill.add") as (journal, active_batch):
             with self._connect() as conn:
                 sequence = record_before(self, journal, active_batch, conn, "skills", "id", skill.id)
-                existing = conn.execute("SELECT * FROM skills WHERE id = ?", (skill.id,)).fetchone()
+                existing = conn.execute(
+                    "SELECT * FROM skills WHERE project = ? AND name = ?",
+                    (skill.project, skill.name),
+                ).fetchone()
+                replaced_sequence = None
+                if existing and existing["id"] != skill.id:
+                    replaced_sequence = record_before(
+                        self, journal, active_batch, conn, "skills", "id", existing["id"]
+                    )
                 conn.execute(
                     """
                     INSERT INTO skills
@@ -167,6 +175,8 @@ class ProceduralDBStore:
                 )
                 conn.commit()
                 record_after(self, journal, conn, "skills", "id", skill.id, sequence)
+                if replaced_sequence is not None:
+                    record_after(self, journal, conn, "skills", "id", existing["id"], replaced_sequence)
 
     def get_all(self, project: str | None = None) -> list[Skill]:
         with self._connect() as conn:

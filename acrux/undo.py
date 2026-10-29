@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from acrux.memory.journal import MutationJournal
+from acrux.memory.journal import MutationJournal, sanitize_row
 from acrux.memory.locks import project_write_lock
 
 
@@ -100,24 +100,28 @@ class UndoCoordinator:
         before = json.loads(entry["before_json"]) if entry["before_json"] is not None else None
         after = json.loads(entry["after_json"]) if entry["after_json"] is not None else None
         current = self._row(store_path, table, entry["key_column"], key)
-        conflict = bool(entry["after_recorded"]) and current != after
+        raw_current = self._row(store_path, table, entry["key_column"], key, sanitize=False)
+        conflict = bool(entry["after_recorded"]) and current != after and current != before
         return {
             **entry,
             "key": key,
             "before": before,
             "after": after,
             "current": current,
+            "raw_current": raw_current,
             "conflict": conflict,
         }
 
     @staticmethod
-    def _row(store_path: Path, table: str, key_column: str, key):
+    def _row(store_path: Path, table: str, key_column: str, key, sanitize: bool = True):
         with sqlite3.connect(store_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 f"SELECT * FROM {table} WHERE {key_column} = ?", (key,)
             ).fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            return sanitize_row(table, dict(row)) if sanitize else dict(row)
 
     @staticmethod
     def _backup_database(source: Path, destination: Path) -> None:
@@ -133,11 +137,16 @@ class UndoCoordinator:
             if entry["before"] is None:
                 conn.execute(f"DELETE FROM {table} WHERE {key_column} = ?", (entry["key"],))
             else:
-                columns = list(entry["before"])
+                before = dict(entry["before"])
+                if table == "facts" and entry["raw_current"] is not None:
+                    for column in ("recall_count", "last_recalled_at"):
+                        if column in entry["raw_current"]:
+                            before[column] = entry["raw_current"][column]
+                columns = list(before)
                 placeholders = ", ".join("?" for _ in columns)
                 conn.execute(
                     f"INSERT OR REPLACE INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
-                    [entry["before"][column] for column in columns],
+                    [before[column] for column in columns],
                 )
             conn.commit()
 

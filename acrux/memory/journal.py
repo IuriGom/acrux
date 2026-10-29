@@ -275,10 +275,20 @@ def mutation_scope(store, batch_id: str | None, operation: str):
     return ScopedMutation(MutationBatch(store.db_path.parent, operation))
 
 
+def sanitize_row(table_name: str, row: dict[str, Any] | None):
+    if row is None:
+        return None
+    sanitized = dict(row)
+    if table_name == "facts":
+        sanitized.pop("recall_count", None)
+        sanitized.pop("last_recalled_at", None)
+    return sanitized
+
+
 def row_image(conn: sqlite3.Connection, table_name: str, key_column: str, key: Any):
     conn.row_factory = sqlite3.Row
     row = conn.execute(f"SELECT * FROM {table_name} WHERE {key_column} = ?", (key,)).fetchone()
-    return dict(row) if row else None
+    return sanitize_row(table_name, dict(row) if row else None)
 
 
 def record_before(store, journal: MutationJournal, batch_id: str, conn, table_name: str, key_column: str, key: Any) -> int:
